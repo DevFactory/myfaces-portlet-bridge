@@ -19,23 +19,15 @@
 
 package org.apache.myfaces.portlet.faces.bridge.wrapper;
 
-
 import javax.portlet.RenderRequest;
 
-import org.apache.myfaces.portlet.faces.bridge.wrapper.PortletRequestDecorator;
-
-public class RenderRequestDecorator
-    extends PortletRequestDecorator
-    implements RenderRequest
+public class RenderRequestDecorator extends PortletRequestDecorator implements RenderRequest
 {
 
+  public RenderRequestDecorator(RenderRequest request) throws IllegalArgumentException
+  {
 
-    public RenderRequestDecorator(RenderRequest request)
-        throws IllegalArgumentException
-    {
-
-        super(request);
-    }
-
+    super(request);
+  }
 
 }
