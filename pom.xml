@@ -21,7 +21,6 @@
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <parent>
     <artifactId>myfaces-master</artifactId>
     <groupId>org.apache.myfaces.maven</groupId>
@@ -29,11 +28,13 @@
   </parent>
 
   <groupId>org.apache.myfaces.portlet-bridge</groupId>
-  <artifactId>jsf-portlet-bridge</artifactId>
+  <artifactId>portlet-bridge</artifactId>
   <packaging>pom</packaging>
   <name>Portlet Bridge for JavaServer Faces</name>
-  <url>http://myfaces.apache.org/bridge</url>
+  <url>http://myfaces.apache.org/portlet-bridge</url>
+  <inceptionYear>2007</inceptionYear>
   <version>1.0.0-SNAPSHOT</version>	 
+  
   <description>
   Portlet Bridge for JavaServer Faces is a subproject of Apache MyFaces which provides an
   implementation of the standardized Portlet Bridge as outlined by JSR-301 and subsequent
@@ -41,19 +42,33 @@
   be used to develop the Portlet Bridge Reference Implementation.
   </description>
 
-  <!--TODO These should be filled out when we get know what goes here-->
-  <!--
   <scm>
     <connection>scm:svn:http://svn.apache.org/repos/asf/myfaces/portlet-bridge/trunk</connection>
     <developerConnection>scm:svn:https://svn.apache.org/repos/asf/myfaces/portlet-bridge/trunk</developerConnection>
     <url>http://svn.apache.org/viewcvs.cgi/myfaces/portlet-bridge/trunk</url>
   </scm>
-
   <issueManagement>
     <system>jira</system>
-    <url>http://issues.apache.org/jira/browse/PORTLET-BRIDGE</url>
+    <url>http://issues.apache.org/jira/browse/PORTLETBRIDGE</url>
   </issueManagement>
-  -->
+
+  <distributionManagement>
+    <repository>
+      <id>apache-maven</id>
+      <name>Apache Maven Repository</name>
+      <url>scpexe://minotaur.apache.org/www/people.apache.org/repo/m2-ibiblio-rsync-repository</url>
+    </repository>
+    <snapshotRepository>
+      <uniqueVersion>false</uniqueVersion>
+      <id>apache-maven-snapshots</id>
+      <name>Apache Maven Snapshot Repository</name>
+      <url>scpexe://minotaur.apache.org/www/people.apache.org/repo/m2-snapshot-repository</url>
+    </snapshotRepository>
+    <site>
+      <id>apache-site</id>
+      <url>scpexe://minotaur.apache.org/www/myfaces.apache.org/portlet-bridge/</url>
+    </site>
+  </distributionManagement>
 
   <modules>
     <module>api</module>
@@ -67,24 +82,34 @@
       <organization>Oracle Corporation, U.S.A.</organization>
       <organizationUrl>http://www.oracle.com/</organizationUrl>
       <email>sobryan@apache.org</email>
+      <roles>
+        <role>Expert Group Member</role>
+        <role>Project Lead</role>
+      </roles>
       <timezone>-7</timezone>
     </developer>
-        
-    <!-- Initial contributors -->
     <developer>
-      <name>Michael Freedman</name>
-      <organization>Oracle Corporation, U.S.A.</organization>
-      <email>michael.freedman@oracle.com</email>
-      <organizationUrl>http://www.oracle.com/</organizationUrl>
-      <timezone>-8</timezone>
+      <id>mmarinschek</id>
+      <name>Martin Marinschek</name>
+      <organization>Irian, Austria</organization>
+      <email>martin.marinschek@gmail.com</email>
+      <roles>
+        <role>Expert Group Member</role>
+        <role>Committer</role>
+      </roles>
+      <timezone>+1</timezone>
     </developer>
-    
     <developer>
-      <name>T. Lei Oh</name>
-      <organization>Oracle Corporation, U.S.A.</organization>
-      <organizationUrl>http://www.oracle.com/</organizationUrl>
-      <email>lei.oh@oracle.com</email>
-      <timezone>-8</timezone>
+      <id>ssilvert</id>
+      <name>Stan Silvert</name>
+      <email>ssilvert@apache.org</email>
+      <organization>JBoss/Blog/organization</organization>
+      <organizationUrl>http://jboss.org/jbossBlog/blog/Stan%20Silvert/</organizationUrl>
+      <roles>
+        <role>Expert Group Member</role>
+        <role>Committer</role>
+      </roles>
+      <timezone />
     </developer>
   </developers>
 
@@ -165,14 +190,14 @@
         <!-- JSF Portlet Bridge API -->
         <dependency>
           <groupId>org.apache.myfaces.portlet-bridge</groupId>
-          <artifactId>jsf-portlet-bridge-api</artifactId>
+          <artifactId>portlet-bridge-api</artifactId>
           <version>${pom.version}</version>
         </dependency>
 
         <!-- JSF Portlet Bridge Impl -->
         <dependency>
           <groupId>org.apache.myfaces.portlet-bridge</groupId>
-          <artifactId>jsf-portlet-bridge-api</artifactId>
+          <artifactId>portlet-bridge-api</artifactId>
           <version>${pom.version}</version>
         </dependency>
       </dependencies>
@@ -235,9 +260,75 @@
     </dependency>
   </dependencies>
 
+  <reporting>
+    <excludeDefaults>true</excludeDefaults>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-project-info-reports-plugin</artifactId>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <configuration>
+          <configLocation>http://svn.apache.org/repos/asf/myfaces/maven/trunk/build-tools/src/main/resources/config/myfaces-checks.xml</configLocation>
+          <headerLocation>http://svn.apache.org/repos/asf/myfaces/maven/trunk/build-tools/src/main/resources/config/myfaces-header.txt</headerLocation>
+          <sourceEncoding>utf-8</sourceEncoding>
+          <minimumTokens>20</minimumTokens>
+          <targetJdk>1.5</targetJdk>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.2</version>
+        <configuration>
+          <aggregate>false</aggregate>
+          <linksource>true</linksource>
+          <breakiterator>true</breakiterator>
+          <quiet>true</quiet>
+          <verbose>false</verbose>
+          <source>1.5</source>
+          <charset>UTF-8</charset>
+          <links>
+            <link>http://java.sun.com/j2se/1.5.0/docs/api</link>
+            <link>http://java.sun.com/javaee/javaserverfaces/1.2_MR1/docs/api</link>
+            <link>http://portals.apache.org/pluto/multiproject/portlet-api/apidocs</link>
+          </links>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <configuration>
+          <linkXref>true</linkXref>
+          <sourceEncoding>utf-8</sourceEncoding>
+          <minimumTokens>100</minimumTokens>
+          <targetJdk>1.5</targetJdk>
+        </configuration>
+      </plugin>
+
+    </plugins>
+  </reporting>
+
   <build>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-checkstyle-plugin</artifactId>
+          <configuration>
+            <configLocation>http://svn.apache.org/repos/asf/myfaces/maven/trunk/build-tools/src/main/resources/config/myfaces-checks.xml</configLocation>
+            <headerLocation>http://svn.apache.org/repos/asf/myfaces/maven/trunk/build-tools/src/main/resources/config/myfaces-header.txt</headerLocation>
+            <sourceEncoding>utf-8</sourceEncoding>
+            <minimumTokens>20</minimumTokens>
+            <targetJdk>1.5</targetJdk>
+          </configuration>
+        </plugin>
+
 
         <!-- Site generation tools (http://maven.apache.org/plugins/maven-site-plugin/index.html)-->
         <plugin>
@@ -246,6 +337,18 @@
           <configuration>
             <outputEncoding>UTF-8</outputEncoding>
           </configuration>
+          <executions>
+            <execution>
+              <phase>package</phase>
+              <id>package</id>
+              <configuration>
+                <generateReports>true</generateReports>
+              </configuration>
+              <goals>
+                <goal>site</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
 
         <!-- Compiler (http://maven.apache.org/plugins/maven-compiler-plugin/index.html)-->
