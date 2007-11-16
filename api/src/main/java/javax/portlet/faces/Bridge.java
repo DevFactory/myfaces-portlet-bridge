@@ -63,6 +63,13 @@ public interface Bridge
   // Special session attribute name to hold the application_scope in the
   // portlet_scope of the session so these are accessible as well.
   public static final String APPLICATION_SCOPE_MAP         = "javax.portlet.faces.ApplicationScopeMap";
+  
+  // Names for special QueryString parameters names the Bridge recognizes in
+  // encodeActionURL as signifying to change the corresponding portlet values
+  // in the resulting URL
+  public static final String PORTLET_MODE_PARAMETER = BRIDGE_PACKAGE_PREFIX + "PortletMode";
+  public static final String PORTLET_WINDOWSTATE_PARAMETER = BRIDGE_PACKAGE_PREFIX + "WindowState";
+  public static final String PORTLET_SECURE_PARAMETER = BRIDGE_PACKAGE_PREFIX + "Secure";
 
   // Following are the names of context attributes that a portlet can set prior
   // to calling the bridge's init() method to control Bridge behavior.

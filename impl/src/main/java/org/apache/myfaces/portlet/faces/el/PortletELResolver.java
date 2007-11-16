@@ -40,6 +40,7 @@ import javax.portlet.PortletConfig;
 import javax.portlet.PortletRequest;
 
 import javax.portlet.faces.Bridge;
+import javax.portlet.faces.BridgeUtil;
 
 public class PortletELResolver extends ELResolver
 {
@@ -77,7 +78,7 @@ public class PortletELResolver extends ELResolver
     ExternalContext extCtx = facesContext.getExternalContext();
 
     // only process if running in a portlet request
-    if (!(extCtx.getRequest() instanceof PortletRequest))
+    if (!BridgeUtil.isPortletRequest())
     {
       return null;
     }

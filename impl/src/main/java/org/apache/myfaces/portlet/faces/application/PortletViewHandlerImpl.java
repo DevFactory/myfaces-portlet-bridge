@@ -24,10 +24,13 @@ import java.io.Writer;
 
 import java.util.Locale;
 
+import java.util.Map;
+
 import javax.faces.FacesException;
 import javax.faces.FactoryFinder;
 import javax.faces.application.StateManager;
 import javax.faces.application.ViewHandler;
+import javax.faces.application.ViewHandlerWrapper;
 import javax.faces.component.UIViewRoot;
 import javax.faces.context.ExternalContext;
 import javax.faces.context.FacesContext;
@@ -38,6 +41,7 @@ import javax.faces.render.RenderKitFactory;
 import javax.portlet.RenderResponse;
 
 import javax.portlet.faces.Bridge;
+import javax.portlet.faces.BridgeUtil;
 import javax.portlet.faces.component.PortletNamingContainerUIViewRoot;
 
 import javax.servlet.ServletContext;
@@ -56,7 +60,7 @@ import org.apache.myfaces.portlet.faces.util.URLUtils;
  * this by overriding the renderView() and ignoring (not interleafing) the non-JSF markup - see HACK
  * below
  */
-public class PortletViewHandlerImpl extends ViewHandler
+public class PortletViewHandlerImpl extends ViewHandlerWrapper
 {
 
   // the ViewHandler to delegate to
@@ -66,40 +70,19 @@ public class PortletViewHandlerImpl extends ViewHandler
   {
     mDelegate = handler;
   }
-
-  @Override
-  public Locale calculateLocale(FacesContext facesContext)
+  
+  protected ViewHandler getWrapped()
   {
-    return mDelegate.calculateLocale(facesContext);
+    return mDelegate;
   }
 
-  @Override
-  public String calculateRenderKitId(FacesContext facesContext)
-  {
-    return mDelegate.calculateRenderKitId(facesContext);
-  }
 
   @Override
   public UIViewRoot createView(FacesContext facesContext, String viewId)
   {
-    // TODO HACK Bug 5961033
-    // In jsf-1.2_03-b09-FCS ViewHandlerImpl's createView() and
-    // restoreView() added codes that check if it's servlet (prefix) or
-    // extension (suffix) mapped. Until RI fixes that:
-    // https://javaserverfaces.dev.java.net/issues/show_bug.cgi?id=546
-    // we'll hack it by setting the following request attr prior to
-    // delegating
-    // to RI's createView()
-    // Note: This is a private constant defined in com.sun.faces.util.Util
-    // as:
-    // private static final String INVOCATION_PATH =
-    // RIConstants.FACES_PREFIX + "INVOCATION_PATH";
-    if (!(facesContext.getExternalContext().getContext() instanceof ServletContext))
-    {
-      facesContext.getExternalContext().getRequestMap().put("com.sun.faces.INVOCATION_PATH",
-                                                            "/faces");
-    }
+
     UIViewRoot viewRoot = mDelegate.createView(facesContext, viewId);
+ 
     if (viewRoot.getClass() != UIViewRoot.class)
     {
       return viewRoot;
@@ -108,66 +91,10 @@ public class PortletViewHandlerImpl extends ViewHandler
     {
       return new PortletNamingContainerUIViewRoot(viewRoot);
     }
+
   }
 
-  /**
-   * The only thing we do here is stuff the original viewId in the query string so we can retrieve
-   * it later in PortletExternalContextImpl.encodeActionURL()
-   */
-  @Override
-  public String getActionURL(FacesContext facesContext, String viewId)
-  {
-    String actionURL = mDelegate.getActionURL(facesContext, viewId);
 
-    if (!(facesContext.getExternalContext().getContext() instanceof ServletContext)) // TODO
-    // -
-    // get
-    // from
-    // request
-    // attribute
-    {
-      actionURL = URLUtils.appendURLArguments(actionURL, new String[] {
-          PortletExternalContextImpl.VIEW_ID_QUERY_PARAMETER, viewId });
-    }
-
-    return actionURL;
-  }
-
-  @Override
-  public String getResourceURL(FacesContext facesContext, String path)
-  {
-    return mDelegate.getResourceURL(facesContext, path);
-  }
-
-  @Override
-  public UIViewRoot restoreView(FacesContext facesContext, String viewId)
-  {
-    // TODO HACK Bug 5961033
-    // In jsf-1.2_03-b09-FCS ViewHandlerImpl's createView() and
-    // restoreView() added codes that check if it's servlet (prefix) or
-    // extension (suffix) mapped. Until RI fixes that:
-    // https://javaserverfaces.dev.java.net/issues/show_bug.cgi?id=546
-    // we'll hack it by setting the following request attr prior to
-    // delegating
-    // to RI's restoreView()
-    // Note: This is a private constant defined in com.sun.faces.util.Util
-    // as:
-    // private static final String INVOCATION_PATH =
-    // RIConstants.FACES_PREFIX + "INVOCATION_PATH";
-    if (!(facesContext.getExternalContext().getContext() instanceof ServletContext))
-    {
-      facesContext.getExternalContext().getRequestMap().put("com.sun.faces.INVOCATION_PATH",
-                                                            "/faces");
-    }
-
-    return mDelegate.restoreView(facesContext, viewId);
-  }
-
-  @Override
-  public void writeState(FacesContext facesContext) throws IOException
-  {
-    mDelegate.writeState(facesContext);
-  }
 
   @Override
   public void renderView(FacesContext context, UIViewRoot viewToRender) throws IOException,
@@ -185,7 +112,7 @@ public class PortletViewHandlerImpl extends ViewHandler
       renderPolicy = Bridge.BridgeRenderPolicy.valueOf("DEFAULT");
     }
 
-    if (context.getExternalContext().getContext() instanceof ServletContext
+    if (!BridgeUtil.isPortletRequest()
         || renderPolicy == Bridge.BridgeRenderPolicy.ALWAYS_DELEGATE)
     {
       mDelegate.renderView(context, viewToRender);
@@ -226,6 +153,12 @@ public class PortletViewHandlerImpl extends ViewHandler
       // to handle error page and text that exists after the <f:view> tag
       // among other things which have lots of servlet dependencies -
       // we're skipping this for now for portlet
+      
+      
+      // Bridge has had to set this attribute so  Faces RI will skip servlet dependent
+      // code when mapping from request paths to viewIds -- however we need to remove it
+      // as it screws up the dispatch
+      extContext.getRequestMap().remove("javax.servlet.include.servlet_path");
       extContext.dispatch(viewToRender.getViewId());
       /*
        * if (executePageToBuildView(context, viewToRender)) { response.flushBuffer(); return; }
@@ -336,9 +269,9 @@ public class PortletViewHandlerImpl extends ViewHandler
   private void doRenderView(FacesContext context, UIViewRoot viewToRender) throws IOException,
                                                                           FacesException
   {
-    ExternalContext extContext = context.getExternalContext();
     viewToRender.encodeAll(context);
   }
+  
 
   private static final class StringBuilderWriter extends Writer
   {

@@ -85,28 +85,36 @@ import org.apache.myfaces.portlet.faces.bridge.wrapper.BridgeRenderRequestWrappe
 import org.apache.myfaces.portlet.faces.util.config.WebConfigurationProcessor;
 import org.apache.myfaces.portlet.faces.context.PortletExternalContextImpl;
 
-public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
+public class BridgeImpl
+  implements Bridge, ELContextListener, PhaseListener
 {
 
   /**
    * 
    */
-  private static final long    serialVersionUID                = -2181720908326762776L;
-  private static final String  REQUEST_SCOPE_LOCK              = "org.apache.myfaces.portlet.faces.requestScopeLock";
-  private static final String  REQUEST_SCOPE_MAP               = "org.apache.myfaces.portlet.faces.requestScopeMap";
-  private static final String  REQUEST_SCOPE_LISTENER          = "org.apache.myfaces.portlet.faces.requestScopeWatch";
-  private static final String  FACES_VIEWROOT                  = "org.apache.myfaces.portlet.faces.facesViewRoot";
-  private static final String  FACES_MESSAGES                  = "org.apache.myfaces.portlet.faces.facesMessages";
-  private static final String  REQUEST_PARAMETERS              = "org.apache.myfaces.portlet.faces.requestParameters";
-  private static final String  REQUEST_SCOPE_ID_RENDER_PARAM   = "_bridgeRequestScopeId";
+  private static final long serialVersionUID = -2181720908326762776L;
+  private static final String REQUEST_SCOPE_LOCK = 
+    "org.apache.myfaces.portlet.faces.requestScopeLock";
+  private static final String REQUEST_SCOPE_MAP = 
+    "org.apache.myfaces.portlet.faces.requestScopeMap";
+  private static final String REQUEST_SCOPE_LISTENER = 
+    "org.apache.myfaces.portlet.faces.requestScopeWatch";
+  private static final String FACES_VIEWROOT = "org.apache.myfaces.portlet.faces.facesViewRoot";
+  private static final String FACES_MESSAGES = "org.apache.myfaces.portlet.faces.facesMessages";
+  // public so PortletStateManager can see/use
+  public static final String UPDATED_VIEW_STATE_PARAM =
+    "org.apache.myfaces.portlet.faces.updatedViewStateParam";
+  private static final String REQUEST_PARAMETERS = 
+    "org.apache.myfaces.portlet.faces.requestParameters";
+  private static final String REQUEST_SCOPE_ID_RENDER_PARAM = "_bridgeRequestScopeId";
 
-  private PortletConfig        mPortletConfig                  = null;
-  private boolean              mPreserveActionParams           = false;
+  private PortletConfig mPortletConfig = null;
+  private boolean mPreserveActionParams = false;
 
-  private FacesContextFactory  mFacesContextFactory            = null;
-  private Lifecycle            mLifecycle                      = null;
+  private FacesContextFactory mFacesContextFactory = null;
+  private Lifecycle mLifecycle = null;
 
-  private Vector               mFacesMappings                  = null;
+  private Vector mFacesMappings = null;
 
   private static final Integer sDefaultMaxManagedRequestScopes = new Integer(100);
 
@@ -115,7 +123,8 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     // everything gets done in the init call.
   }
 
-  public void init(PortletConfig config) throws BridgeException
+  public void init(PortletConfig config)
+    throws BridgeException
   {
     mPortletConfig = config;
     PortletContext portletContext = mPortletConfig.getPortletContext();
@@ -124,10 +133,9 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     // however don't process renderPolicy here because its used in
     // ViewHandler (and needs to be at request scope) -- hence this
     // is done in ExternalContext.
-    Boolean configParam = (Boolean) portletContext.getAttribute(Bridge.BRIDGE_PACKAGE_PREFIX
-                                                                + mPortletConfig.getPortletName()
-                                                                + "."
-                                                                + Bridge.PRESERVE_ACTION_PARAMS);
+    Boolean configParam = 
+      (Boolean) portletContext.getAttribute(Bridge.BRIDGE_PACKAGE_PREFIX + mPortletConfig.getPortletName() + 
+                                            "." + Bridge.PRESERVE_ACTION_PARAMS);
     if (configParam != null)
     {
       mPreserveActionParams = configParam.booleanValue();
@@ -152,8 +160,8 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
 
     // Add self as ELContextListener to the Faces App so we can add the
     // portletConfig to any newly created contexts.
-    ApplicationFactory appFactory = (ApplicationFactory) FactoryFinder
-                                                                      .getFactory(FactoryFinder.APPLICATION_FACTORY);
+    ApplicationFactory appFactory = 
+      (ApplicationFactory) FactoryFinder.getFactory(FactoryFinder.APPLICATION_FACTORY);
     Application app = appFactory.getApplication();
     app.addELContextListener(this);
 
@@ -167,7 +175,8 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     }
   }
 
-  public void doFacesRequest(ActionRequest request, ActionResponse response) throws BridgeException
+  public void doFacesRequest(ActionRequest request, ActionResponse response)
+    throws BridgeException
   {
     Map m = null;
     // Set the Portlet lifecycle phase as a request attribute so its
@@ -195,14 +204,15 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     try
     {
       // Get the FacesContext instance for this request
-      context = getFacesContextFactory().getFacesContext(mPortletConfig, request, response,
-                                                         getLifecycle());
-      logMap("Received ActionParams: ", context.getExternalContext().getRequestParameterValuesMap());
+      context = 
+          getFacesContextFactory().getFacesContext(mPortletConfig, request, response, getLifecycle());
+      logMap("Received ActionParams: ", 
+             context.getExternalContext().getRequestParameterValuesMap());
 
       // Each action starts a new "action lifecycle"
       // The Bridge preserves request scoped data and if so configured
       // Action Parameters for the duration of an action lifecycle
-      String scopeId = initBridgeRequestScope(response);
+      String scopeId = initBridgeRequestScope(request, response);
 
       // For actions we only execute the lifecycle phase
       getLifecycle().execute(context);
@@ -273,9 +283,11 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     logMap("Action completed: ", m);
   }
 
-  public void doFacesRequest(RenderRequest request, RenderResponse response) throws BridgeException
+  public void doFacesRequest(RenderRequest request, RenderResponse response)
+    throws BridgeException
   {
-
+    String scopeId = null;
+    
     // Set the Portlet lifecycle phase as a request attribute so its
     // available to Faces extensions -- allowing that code to NOT rely on
     // instanceof which can fail if a portlet container uses a single class
@@ -294,17 +306,18 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     {
       // Get the FacesContext instance for this request
       Lifecycle lifecycle = getLifecycle();
-      context = getFacesContextFactory().getFacesContext(mPortletConfig, request, response,
-                                                         lifecycle);
+      context = 
+          getFacesContextFactory().getFacesContext(mPortletConfig, request, response, lifecycle);
       ExternalContext extCtx = context.getExternalContext();
 
-      logMap("Received RenderParams: ", context.getExternalContext().getRequestParameterValuesMap());
+      logMap("Received RenderParams: ", 
+             context.getExternalContext().getRequestParameterValuesMap());
 
       // Use request from ExternalContext in case its been wrapped by an
       // extension
       RenderRequest extRequest = (RenderRequest) extCtx.getRequest();
 
-      String scopeId = extRequest.getParameter(REQUEST_SCOPE_ID_RENDER_PARAM);
+      scopeId = extRequest.getParameter(REQUEST_SCOPE_ID_RENDER_PARAM);
 
       if (restoreBridgeRequestScopeData(context, scopeId))
       {
@@ -353,7 +366,12 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
         }
         catch (Exception e)
         {
-          ;
+          // When exception occurs remove stored scope so don't
+          // get stuck replaying the error when/if user refreshes
+          if (scopeId != null)
+          {
+            removeRequestScopes(scopeId);
+          }
         }
         finally
         {
@@ -361,10 +379,25 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
         }
       }
       getLifecycle().render(context);
+      
+      // When we have navigated to this view between the action and render
+      // the initial VIEW_STATE_PARAM reflects the actions view -- update
+      // here to the one from this render so refresh will work.
+      if (scopeId != null)
+      {
+        updateViewStateParam(context, scopeId);
+      }
 
     }
     catch (Exception e)
     {
+      // When exception occurs remove stored scope so don't
+      // get stuck replaying the error when/if user refreshes
+      if (scopeId != null)
+      {
+        removeRequestScopes(scopeId);
+      }
+      
       context.getExternalContext().log("Exception thrown in doFacesRequest:render", e);
       if (!(e instanceof BridgeException))
       {
@@ -390,7 +423,7 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     // remove any scopes being managed for this portlet
     // Each scope has a per portlet prefix -- pass in the prefix
     // constructed by adding the prefix to an empty string.
-    // removeRequestScopes(qualifyScopeId(""));
+    removeRequestScopes(qualifyScopeId(mPortletConfig.getPortletName(), null, null));
 
     mPortletConfig = null;
   }
@@ -410,14 +443,15 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     }
   }
 
-  private FacesContextFactory getFacesContextFactory() throws BridgeException
+  private FacesContextFactory getFacesContextFactory()
+    throws BridgeException
   {
     try
     {
       if (mFacesContextFactory == null)
       {
-        mFacesContextFactory = (FacesContextFactory) FactoryFinder
-                                                                  .getFactory(FactoryFinder.FACES_CONTEXT_FACTORY);
+        mFacesContextFactory = 
+            (FacesContextFactory) FactoryFinder.getFactory(FactoryFinder.FACES_CONTEXT_FACTORY);
       }
       return mFacesContextFactory;
     }
@@ -428,16 +462,17 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     }
   }
 
-  private Lifecycle getLifecycle() throws BridgeException
+  private Lifecycle getLifecycle()
+    throws BridgeException
   {
     try
     {
       if (mLifecycle == null)
       {
-        LifecycleFactory lifecycleFactory = (LifecycleFactory) FactoryFinder
-                                                                            .getFactory(FactoryFinder.LIFECYCLE_FACTORY);
-        String lifecycleId = mPortletConfig.getPortletContext()
-                                           .getInitParameter(FacesServlet.LIFECYCLE_ID_ATTR);
+        LifecycleFactory lifecycleFactory = 
+          (LifecycleFactory) FactoryFinder.getFactory(FactoryFinder.LIFECYCLE_FACTORY);
+        String lifecycleId = 
+          mPortletConfig.getPortletContext().getInitParameter(FacesServlet.LIFECYCLE_ID_ATTR);
         if (lifecycleId == null)
         {
           lifecycleId = LifecycleFactory.DEFAULT_LIFECYCLE;
@@ -490,11 +525,11 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     Map requestParameterMap = ec.getRequestParameterValuesMap();
     if (!mPreserveActionParams)
     {
-      if (requestMap != null && requestParameterMap != null
-          && requestParameterMap.containsKey(ResponseStateManager.VIEW_STATE_PARAM))
+      if (requestMap != null && requestParameterMap != null && 
+          requestParameterMap.containsKey(ResponseStateManager.VIEW_STATE_PARAM))
       {
         HashMap m = new HashMap(1);
-        m.put(ResponseStateManager.VIEW_STATE_PARAM,
+        m.put(ResponseStateManager.VIEW_STATE_PARAM, 
               requestParameterMap.get(ResponseStateManager.VIEW_STATE_PARAM));
         requestMap.put(REQUEST_PARAMETERS, m);
       }
@@ -506,6 +541,91 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
       // be available during render.
       requestMap.put(REQUEST_PARAMETERS, requestParameterMap);
     }
+  }
+  
+  private void updateViewStateParam(FacesContext context, String scopeId)
+  {
+    
+    // First make sure we have a value to update
+    String updatedViewStateParam = (String) context.getExternalContext()
+        .getRequestMap().get(UPDATED_VIEW_STATE_PARAM);
+    
+    if (updatedViewStateParam == null)
+        return;
+    
+    // Otherwise we need to update/store this value in the scope
+    PortletContext portletContext = mPortletConfig.getPortletContext();
+
+    // Get the request scope lock -- because its added during init it should
+    // always be there.
+    synchronized (portletContext.getAttribute(REQUEST_SCOPE_LOCK))
+    {
+      // get the managedScopeMap
+      LRUMap requestScopeMap = (LRUMap) portletContext.getAttribute(REQUEST_SCOPE_MAP);
+
+      if (requestScopeMap == null)
+      {
+        requestScopeMap = createRequestScopeMap(portletContext);
+        portletContext.setAttribute(REQUEST_SCOPE_MAP, requestScopeMap);
+      }
+
+      // Prepare the value for storing as a preserved parameter
+      // Store as an array of Strings with just one entry as per
+      // portlet request
+      String[] values = new String[1];
+      values[0] = updatedViewStateParam;
+
+      // now see if this scope is in the Map
+      Map scopeMap = (Map) requestScopeMap.get(scopeId);
+      Boolean isNew = false;
+
+      if (scopeMap == null) 
+      {
+        // allocate a Map  and put
+        scopeMap = new HashMap(1);
+        // delay adding to requestScopeMap until populated
+        isNew = true;
+      }
+      
+      // Now get the RequestParameters from the scope
+      Map requestParams = (Map) scopeMap.get(REQUEST_PARAMETERS);
+      if (requestParams == null) 
+      {
+        requestParams = (Map) new HashMap(1);
+        scopeMap.put(REQUEST_PARAMETERS, requestParams);
+      }
+      // finally update the value in the Map
+      requestParams.put(ResponseStateManager.VIEW_STATE_PARAM, values);
+      
+      // if a newly allocated scope -- don't forget to add it in
+      if (isNew)
+      {
+        requestScopeMap.put(scopeId, scopeMap);
+      }
+      
+    }
+
+  }
+  
+  private LRUMap createRequestScopeMap(PortletContext portletContext) 
+  {
+    // see if portlet has defined how many requestScopes to manage
+    // for this portlet
+    String managedScopesSetting = 
+      portletContext.getInitParameter(Bridge.MAX_MANAGED_REQUEST_SCOPES);
+    Integer managedScopes = null;
+    
+    if (managedScopesSetting != null)
+    {
+        managedScopes = Integer.getInteger(managedScopesSetting);
+    }
+    
+    if (managedScopes == null || managedScopes.intValue() <= 0)
+    {
+      managedScopes = sDefaultMaxManagedRequestScopes;
+    }
+
+    return new LRUMap(managedScopes.intValue());
   }
 
   private RenderRequest restoreActionParams(FacesContext context)
@@ -545,8 +665,6 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
         }
       }
 
-      context.getExternalContext().log("PortletPhaseListenerImpl.saveFacesMessageState()");
-
       // save state in ViewRoot attributes
       Map requestMap = context.getExternalContext().getRequestMap();
       requestMap.put(FACES_MESSAGES, state);
@@ -565,7 +683,6 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
 
       if (state1 != null)
       {
-        context.getExternalContext().log("PortletPhaseListenerImpl.restoreFacesMessageState()");
         Iterator messages;
         Iterator clientIds = state1.getClientIds();
         while (clientIds.hasNext())
@@ -581,13 +698,15 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     }
   }
 
-  private String initBridgeRequestScope(ActionResponse response)
+  private String initBridgeRequestScope(ActionRequest request, ActionResponse response)
   {
 
     // Generate an RMI UID, which is a unique identifier WITHIN the local
     // host. This will be used as the new lifecyleID
     UID uid = new UID();
-    String requestScopeId = qualifyScopeId(uid.toString());
+    String requestScopeId = qualifyScopeId(mPortletConfig.getPortletName(),
+                                           request.getPortletSession(true).getId(),
+                                           uid.toString());
 
     // set in response render parameter so will receive in future calls
     // however don't store internally until there is specific state to
@@ -597,14 +716,13 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     return requestScopeId;
   }
 
-  private void saveBridgeRequestScopeData(FacesContext context, String scopeId, String[] excludeList)
+  private void saveBridgeRequestScopeData(FacesContext context, String scopeId, 
+                                          String[] excludeList)
   {
 
-    // TODO -- check config setting and if stipulated preserve ActionParams
-
     // Store the RequestMap @ the bridge's request scope
-    putBridgeRequestScopeData(scopeId, copyRequestMap(context.getExternalContext().getRequestMap(),
-                                                      excludeList));
+    putBridgeRequestScopeData(scopeId, 
+                              copyRequestMap(context.getExternalContext().getRequestMap(), excludeList));
 
     // flag the data so can remove it if the session terminates
     // as its unlikely useful if the session disappears
@@ -624,16 +742,7 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
 
       if (requestScopeMap == null)
       {
-        // see if portlet has defined how many requestScopes to manage
-        // for this portlet
-        Integer managedScopes = (Integer) portletContext
-                                                        .getAttribute(Bridge.MAX_MANAGED_REQUEST_SCOPES);
-        if (managedScopes == null || managedScopes.intValue() <= 0)
-        {
-          managedScopes = sDefaultMaxManagedRequestScopes;
-        }
-
-        requestScopeMap = new LRUMap(managedScopes.intValue());
+        requestScopeMap = createRequestScopeMap(portletContext);
         portletContext.setAttribute(REQUEST_SCOPE_MAP, requestScopeMap);
       }
 
@@ -657,8 +766,8 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
         // TODO -- restore the ACTION PARAMS if there
 
         // Don't copy any of the portlet or Faces objects
-        if (!inExcludeList(excludeList, requestAttrKey)
-            && !contextObject(requestAttrKey, requestAttrValue))
+        if (!inExcludeList(excludeList, requestAttrKey) && 
+            !contextObject(requestAttrKey, requestAttrValue))
         {
           copy.put(requestAttrKey, requestAttrValue);
         }
@@ -673,7 +782,7 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     {
       return false;
     }
-    for (String element : excludeList)
+    for (String element: excludeList)
     {
       if (element.equals(key))
       {
@@ -717,13 +826,16 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
 
   private boolean contextObject(String s, Object o)
   {
-    return o instanceof PortletConfig || o instanceof PortletContext || o instanceof PortletRequest
-           || o instanceof PortletResponse || o instanceof PortletSession
-           || o instanceof PortletPreferences || o instanceof PortalContext
-           || o instanceof FacesContext || o instanceof ExternalContext
-           || o instanceof ServletConfig || o instanceof ServletContext
-           || o instanceof ServletRequest || o instanceof ServletResponse
-           || o instanceof HttpSession || s.startsWith("javax.servlet.include");
+    return o instanceof PortletConfig || o instanceof PortletContext || 
+      o instanceof PortletRequest || o instanceof PortletResponse || o instanceof PortletSession || 
+      o instanceof PortletPreferences || o instanceof PortalContext || o instanceof FacesContext || 
+      o instanceof ExternalContext || o instanceof ServletConfig || o instanceof ServletContext || 
+      o instanceof ServletRequest || o instanceof ServletResponse || o instanceof HttpSession || 
+      s.startsWith("javax.servlet.include") ||
+      s.startsWith("javax.portlet.faces.") ||
+      s.startsWith("org.apache.myfaces.trinidad") ||
+      s.startsWith("com.sun.faces.") ||
+      s.startsWith("javax.portlet.");
   }
 
   private void logMap(String message, Map m)
@@ -738,7 +850,13 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
       while (keys != null && keys.hasNext())
       {
         String requestAttrKey = (String) keys.next();
-        context.log("     Map entry: " + requestAttrKey);
+        Object o = m.get(requestAttrKey);
+        if (o instanceof String)
+          context.log("     Map entry: " + requestAttrKey +"   value:" + (String) o);
+        else if (o instanceof String[])
+          context.log("     Map entry: " + requestAttrKey + "   value:" + ((String[]) o)[0]);
+        else
+          context.log("     Map entry: " + requestAttrKey);
       }
     }
     else
@@ -750,7 +868,7 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
   }
 
   private boolean restoreBridgeRequestScopeData(FacesContext context, String scopeId)
-                                                                                     throws BridgeException
+    throws BridgeException
   {
 
     PortletContext portletContext = mPortletConfig.getPortletContext();
@@ -805,7 +923,8 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     return true;
   }
 
-  private boolean removeFromBridgeRequestScopeData(FacesContext context, String scopeId, String key)
+  private boolean removeFromBridgeRequestScopeData(FacesContext context, String scopeId, 
+                                                   String key)
   {
     PortletContext portletContext = mPortletConfig.getPortletContext();
     Map m = null;
@@ -839,15 +958,30 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
   }
 
   /*
-   * Takes in the scopeId and prefixes it with portletName: This is done so we can later remove this
-   * portlet's managed scopes when needed
+   * A scope is qualified first by the portlet this scope has been created for 
+   * and then second by the specific session this scope is used in.  By doing
+   * this we are able to remove this specific scope, all the scopes associated 
+   * with a particular session, or all the scopes associated with a particular
+   * portlet regardless of sessions.
    */
 
-  private String qualifyScopeId(String scopeId)
+  private String qualifyScopeId(String portletId, String sessionId, String scopeId)
   {
-    StringBuffer sb = new StringBuffer(mPortletConfig.getPortletName());
+    // a qualified scope Id must at a minimum be qualified by a portletId
+    if (portletId == null) portletId = mPortletConfig.getPortletName();
+    
+    StringBuffer sb = new StringBuffer(portletId);
     sb.append(':');
-    sb.append(scopeId);
+    if (sessionId != null) 
+    {
+      sb.append(sessionId);
+      sb.append(':');
+      if (scopeId != null)
+      {
+        sb.append(scopeId);
+      }
+    }
+
     return sb.toString();
   }
 
@@ -856,20 +990,24 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     PortletSession session = (PortletSession) context.getExternalContext().getSession(true);
     if (session != null)
     {
-      RequestScopeListener scopeListener = (RequestScopeListener) session
-                                                                         .getAttribute(REQUEST_SCOPE_LISTENER);
+      RequestScopeListener scopeListener = 
+        (RequestScopeListener) session.getAttribute(REQUEST_SCOPE_LISTENER);
       if (scopeListener == null)
       {
         // only store the qualified prefix
         // if invalidated we walk the entire REQUEST_SCOPE Map and
         // remove
         // every scope that starts with this prefix.
-        session.setAttribute(REQUEST_SCOPE_LISTENER, new RequestScopeListener(qualifyScopeId("")));
+        session.setAttribute(REQUEST_SCOPE_LISTENER, new RequestScopeListener(
+                                                       qualifyScopeId(mPortletConfig.getPortletName(),
+                                                                      session.getId(),
+                                                                      null)));
       }
     }
   }
 
-  private void finalizeActionResponse(FacesContext context) throws IOException
+  private void finalizeActionResponse(FacesContext context)
+    throws IOException
   {
 
     // We rely on Faces ExternalContext.encodeActionURL to do the heavy
@@ -894,6 +1032,52 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     context.getExternalContext().redirect(encodedActionURL);
   }
 
+  private void removeRequestScopes(String scopePrefix)
+  {
+
+    // Get the RequestScope Map and remove all entries/scopes with this prefix
+    PortletContext portletContext = mPortletConfig.getPortletContext();
+
+    // Get the request scope lock -- because its added during init it should
+    // always be there.
+    Object lock = portletContext.getAttribute(REQUEST_SCOPE_LOCK);
+    if (lock == null)
+      return;
+
+    synchronized (lock)
+    {
+      // get the managedScopeMap
+      LRUMap requestScopeMap = (LRUMap) portletContext.getAttribute(REQUEST_SCOPE_MAP);
+      Vector v = new Vector(10);
+
+      if (requestScopeMap != null)
+      {
+        Set keySet = requestScopeMap.keySet();
+        if (keySet != null)
+        {
+          Iterator keys = keySet.iterator();
+          while (keys != null && keys.hasNext())
+          {
+            String scopeId = (String) keys.next();
+            if (scopeId != null && scopeId.startsWith(scopePrefix))
+            {
+              // can't remove while iterating or else get a concurrency exception
+              v.add(scopeId);
+            }
+          }
+        }
+
+        for (int i = 0; i < v.size(); i++)
+        {
+          String scopeId = (String) v.elementAt(i);
+          requestScopeMap.remove(scopeId);
+        }
+      }
+    }
+    
+    
+  }
+
   /* Implement the PhaseListener methods */
 
   public PhaseId getPhaseId()
@@ -916,14 +1100,15 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     }
   }
 
-  private final class LRUMap extends LinkedHashMap
+  private final class LRUMap
+    extends LinkedHashMap
   {
 
     /**
      * 
      */
     private static final long serialVersionUID = 4372455368577337965L;
-    private int               mMaxCapacity;
+    private int mMaxCapacity;
 
     public LRUMap(int maxCapacity)
     {
@@ -947,14 +1132,15 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
   // extensions from this
   // detail and leave it all in this controller part.
 
-  private final class FacesMessageState implements Serializable
+  private final class FacesMessageState
+    implements Serializable
   {
     /**
      * 
      */
     private static final long serialVersionUID = 8438070672451887050L;
     // For saving and restoring FacesMessages
-    private Map               mMessages        = new HashMap();       // key=clientId;
+    private Map mMessages = new HashMap(); // key=clientId;
 
     // value=FacesMessages
 
@@ -988,7 +1174,8 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     }
   }
 
-  private final class RequestScopeListener implements HttpSessionBindingListener
+  private final class RequestScopeListener
+    implements HttpSessionBindingListener
   {
     String mScopePrefix = null;
 
@@ -1005,7 +1192,7 @@ public class BridgeImpl implements Bridge, ELContextListener, PhaseListener
     public void valueUnbound(HttpSessionBindingEvent event)
     {
       // Call is in the BridgeImpl class
-      // removeRequestScopes((String)event.getValue());
+      removeRequestScopes(mScopePrefix);
     }
 
   }

@@ -68,9 +68,14 @@ import java.util.Vector;
 
 import javax.faces.application.ViewHandler;
 
+import javax.faces.context.FacesContext;
+
+import javax.portlet.PortletMode;
+import javax.portlet.WindowState;
 import javax.portlet.faces.Bridge;
 
 import javax.portlet.faces.BridgeDefaultViewNotSpecifiedException;
+import javax.portlet.faces.BridgeUtil;
 
 /**
  * This implementation of {@link ExternalContext} is specific to the portlet implementation.
@@ -145,22 +150,20 @@ public class PortletExternalContextImpl extends ExternalContext
 
     mPhase = (Bridge.PortletPhase) mPortletRequest.getAttribute(Bridge.PORTLET_LIFECYCLE_PHASE);
 
-    if (mPhase == Bridge.PortletPhase.RenderPhase)
-    {
-      log("PortletExternalContextImpl.<init>: RENDER");
-      System.out.println("=====RENDER====="); // TODO DEBUG
-    }
-    else
-    {
-      log("PortletExternalContextImpl.<init>: ACTION");
-      System.out.println("=====ACTION====="); // TODO DEBUG
-    }
 
+    // viewId is the actual context relative path to the resource
     mViewId = getViewId();
-
-    // Now reverse engineer the servlet paths from the mappings
+    
+    // Now reverse engineer the servlet paths from the mappings 
+    // So Faces thinks was a client request
     mFacesMappings = (Vector) mPortletRequest.getAttribute(FACES_MAPPING_ATTRIBUTE);
     mapPathsFromViewId(mViewId, mFacesMappings);
+
+
+    // JSF RI relies on a request attribute setting to properly handle
+    // suffix mapping -- but because their suffix mapping code is servlet dependent
+    // we need to set it for them
+    setFacesMapping();
 
     // Get the DelegateRender context parameter here and set as a request
     // attribute
@@ -226,7 +229,7 @@ public class PortletExternalContextImpl extends ExternalContext
   @Override
   public String encodeActionURL(String url)
   {
-    String viewId = null;
+    String viewId = null, path = null;
     QueryString queryStr = null;
     int queryStart = -1;
 
@@ -241,46 +244,29 @@ public class PortletExternalContextImpl extends ExternalContext
 
     // Now determine the target viewId
 
-    // First: if it looks this is a bridge encoded action url
-    // try and process as such
-    if (url.indexOf(VIEW_ID_QUERY_PARAMETER) > -1)
+    // First: split URL into path and query string
+    // Hold onto QueryString for later processing
+    queryStart = url.indexOf('?');
+
+    if (queryStart != -1)
     {
-      // First, parse and remove the viewId from the URL
-      queryStart = url.indexOf('?');
-
-      if (queryStart != -1)
-      {
-        // Get the query string
-        queryStr = new QueryString(url.substring(queryStart + 1), "UTF8");
-
-        // Now rebuild the URL without this parameter
-        viewId = queryStr.getParameter(VIEW_ID_QUERY_PARAMETER);
-        queryStr.removeParameter(VIEW_ID_QUERY_PARAMETER);
-
-        String query = queryStr.toString();
-        if (query != null && query.length() != 0)
-        {
-          url = url.substring(0, queryStart) + "?" + query;
-        }
-        else
-        {
-          url = url.substring(0, queryStart);
-        }
-      }
+      // Get the query string
+      queryStr = new QueryString(url.substring(queryStart + 1), "UTF8");
+      path = url.substring(0, queryStart);
+    }
+    else
+    {
+      path = url;
     }
 
-    // Did we find the viewId? If not assume a native URL -- and hence
-    // cull the viewId by using servlet path matching rules
-    if (viewId == null)
+    // Determine the viewId by inspecting the URL
+    if (!isRelativePath(path))
     {
-      if (!isRelativePath(url))
-      {
-        viewId = getViewIdFromPath(url);
-      }
-      else
-      {
-        viewId = getViewIdFromRelativePath(url);
-      }
+      viewId = getViewIdFromPath(path);
+    }
+    else
+    {
+        viewId = getViewIdFromRelativePath(path);
     }
 
     if (viewId == null)
@@ -297,7 +283,7 @@ public class PortletExternalContextImpl extends ExternalContext
       RenderResponse renderResponse = (RenderResponse) getResponse();
       PortletURL actionURL = renderResponse.createActionURL();
       actionURL.setParameter(ACTION_ID_PARAMETER_NAME, viewId);
-
+      
       // Add extra parameters so they don't get lost
       if (queryStr != null)
       {
@@ -305,15 +291,50 @@ public class PortletExternalContextImpl extends ExternalContext
         while (list.hasMoreElements())
         {
           String param = list.nextElement().toString();
-          actionURL.setParameter(param, queryStr.getParameter(param));
+          if (param.equals(Bridge.PORTLET_MODE_PARAMETER))
+          {
+            try 
+            {
+              actionURL.setPortletMode(new PortletMode(queryStr.getParameter(param)));
+            }
+            catch (Exception e)
+            {
+              ; // do nothing -- just ignore
+            }
+          }
+          else if (param.equals(Bridge.PORTLET_WINDOWSTATE_PARAMETER))
+          {
+            try 
+            {
+              actionURL.setWindowState(new WindowState(queryStr.getParameter(param)));
+            }
+            catch (Exception e)
+            {
+              ; // do nothing -- just ignore
+            }
+          }
+          else if (param.equals(Bridge.PORTLET_SECURE_PARAMETER))
+          {
+            try 
+            {
+              actionURL.setSecure(Boolean.getBoolean(queryStr.getParameter(param)));
+            }
+            catch (Exception e)
+            {
+              ; // do nothing -- just ignore
+            }
+          }
+          else
+          {
+            actionURL.setParameter(param, queryStr.getParameter(param));
+          }
         }
       }
 
       // TODO hack to workaround double encoding problem
       String actionURLStr = actionURL.toString();
       actionURLStr = actionURLStr.replaceAll("\\&amp\\;", "&");
-      log("PortletExternalContextImpl.encodeActionURL:end:RENDER(viewId=" + viewId
-          + ";  actionURL=" + actionURLStr + ")");
+
       return actionURLStr;
     }
     else
@@ -329,24 +350,40 @@ public class PortletExternalContextImpl extends ExternalContext
         while (list.hasMoreElements())
         {
           String param = list.nextElement().toString();
-          actionResponse.setRenderParameter(param, queryStr.getParameter(param));
+          if (param.equals(Bridge.PORTLET_MODE_PARAMETER))
+          {
+            try 
+            {
+              actionResponse.setPortletMode(new PortletMode(queryStr.getParameter(param)));
+            }
+            catch (Exception e)
+            {
+              ; // do nothing -- just ignore
+            }
+          }
+          else if (param.equals(Bridge.PORTLET_WINDOWSTATE_PARAMETER))
+          {
+            try 
+            {
+              actionResponse.setWindowState(new WindowState(queryStr.getParameter(param)));
+            }
+            catch (Exception e)
+            {
+              ; // do nothing -- just ignore
+            }
+          }
+          else if (param.equals(Bridge.PORTLET_SECURE_PARAMETER))
+          {
+            ; // ignore -- do nothing as can't encode into an actionResponse
+          }
+          else
+          {
+            actionResponse.setRenderParameter(param, queryStr.getParameter(param));
+          }
         }
       }
 
-      log("PortletExternalContextImpl.encodeActionURL:end:ACTION(" + viewId + ")");
-
-      // Since this is an action -- enocodeActionURL shouldn't be written
-      // into markup anywhere -- hence nothing of value to return.
-      // To distinguish between this case and when the path is absolute
-      // (and
-      // might be used for a redirect the spec says return something
-      // different
-      // then was passed in.
-
-      // ContextPath is added so still seen as a local URL and hence isn't
-      // processed by redirect
-      return getRequestContextPath()
-             + "/PortletFacesBridge/endcodeActionURL/encodeInActionPhase/doNothing";
+      return url;
     }
   }
 
@@ -357,7 +394,6 @@ public class PortletExternalContextImpl extends ExternalContext
     // redirects within this app are dealt (elsewhere) as navigations
     // so do nothing. External links are redirected
 
-    log("PortletExternalContextImpl.redirect(" + url + ")");
     if (mPhase == Bridge.PortletPhase.ActionPhase
         && (url.startsWith("#") || isExternalURL(url) || isDirectLink(url)))
     {
@@ -402,7 +438,6 @@ public class PortletExternalContextImpl extends ExternalContext
 
     // Avoid double encoding
     resourceURLStr = resourceURLStr.replaceAll("\\&amp\\;", "&");
-    log("PortletExternalContextImpl.encodeResourceURL:end(" + resourceURLStr + ")");
 
     return resourceURLStr;
   }
@@ -419,9 +454,6 @@ public class PortletExternalContextImpl extends ExternalContext
     {
       throw new IllegalStateException("Request cannot be an ActionRequest");
     }
-
-    log("PortletExternalContextImpl.dispatch: response content type "
-        + ((RenderResponse) mPortletResponse).getContentType());
 
     PortletRequestDispatcher prd = mPortletContext.getRequestDispatcher(requestURI);
 
@@ -478,7 +510,6 @@ public class PortletExternalContextImpl extends ExternalContext
   {
     if (mApplicationMap == null)
     {
-      log("PortletExternalContextImpl.getApplicationMap: creating PortletApplicationMap");
       mApplicationMap = new PortletApplicationMap(mPortletContext);
     }
     return mApplicationMap;
@@ -489,7 +520,6 @@ public class PortletExternalContextImpl extends ExternalContext
   {
     if (mSessionMap == null)
     {
-      log("PortletExternalContextImpl.getSessionMap: creating PortletSessionMap");
       mSessionMap = new PortletSessionMap(mPortletRequest);
     }
     return mSessionMap;
@@ -500,7 +530,6 @@ public class PortletExternalContextImpl extends ExternalContext
   {
     if (mRequestMap == null)
     {
-      log("PortletExternalContextImpl.getRequestMap: creating PortletRequestMap");
       mRequestMap = new PortletRequestMap(mPortletRequest);
     }
     return mRequestMap;
@@ -511,7 +540,6 @@ public class PortletExternalContextImpl extends ExternalContext
   {
     if (mRequestParameterMap == null)
     {
-      log("PortletExternalContextImpl.getRequestParameterMap: creating PortletRequestParameterMap");
       mRequestParameterMap = Collections
                                         .unmodifiableMap(new PortletRequestParameterMap(
                                                                                         mPortletRequest,
@@ -524,7 +552,6 @@ public class PortletExternalContextImpl extends ExternalContext
   {
     if (mRequestParameterValuesMap == null)
     {
-      log("PortletExternalContextImpl.getRequestParameterValuesMap: creating PortletRequestParameterValuesMap");
       mRequestParameterValuesMap = Collections
                                               .unmodifiableMap(new PortletRequestParameterValuesMap(
                                                                                                     mPortletRequest,
@@ -562,7 +589,6 @@ public class PortletExternalContextImpl extends ExternalContext
   {
     if (mRequestHeaderMap == null)
     {
-      log("PortletExternalContextImpl.getRequestHeaderMap: creating PortletRequestHeaderMap");
       if (mPortletRequestHeaders == null)
       {
         mPortletRequestHeaders = new PortletRequestHeaders(mOrigPortletRequest);
@@ -577,7 +603,6 @@ public class PortletExternalContextImpl extends ExternalContext
   {
     if (mRequestHeaderValuesMap == null)
     {
-      log("PortletExternalContextImpl.getRequestHeaderValuesMap: creating PortletRequestHeaderValuesMap");
       if (mPortletRequestHeaders == null)
       {
         mPortletRequestHeaders = new PortletRequestHeaders(mOrigPortletRequest);
@@ -617,7 +642,6 @@ public class PortletExternalContextImpl extends ExternalContext
   {
     if (mInitParameterMap == null)
     {
-      log("PortletExternalContextImpl.getInitParameterMap: creating PortletInitParameterMap");
       mInitParameterMap = new PortletInitParameterMap(mPortletContext);
     }
     return mInitParameterMap;
@@ -635,7 +659,7 @@ public class PortletExternalContextImpl extends ExternalContext
 
   public String encodeNamespace(String s)
   {
-    if (!(mPortletResponse instanceof RenderResponse))
+    if (!BridgeUtil.isPortletRenderRequest())
     {
       throw new IllegalStateException("Only RenderResponse can be used to encode a namespace");
     }
@@ -972,6 +996,7 @@ public class PortletExternalContextImpl extends ExternalContext
       {
         throw new BridgeDefaultViewNotSpecifiedException();
       }
+      
       log("PortletExternalContextImpl.getViewId: action_id not found, defaulting to: " + viewId);
     }
 
@@ -1007,7 +1032,7 @@ public class PortletExternalContextImpl extends ExternalContext
 
     return viewId;
   }
-
+  
   private void mapPathsFromViewId(String viewId, Vector mappings)
   {
     if (viewId == null || mappings == null)
@@ -1018,39 +1043,53 @@ public class PortletExternalContextImpl extends ExternalContext
       mPathInfo = viewId;
       return;
     }
-
-    // see if the viewId terminates with an extension
-    // if non-null value contains *.XXX where XXX is the extension
-    String ext = extensionMappingFromViewId(viewId);
-    if (ext != null && mappings.contains(ext))
+    
+    // The only thing that matters is we use a configured mapping
+    // So just use the first one
+    String mapping = (String) mappings.elementAt(0);
+    if (mapping.startsWith("*"))
     {
+      // we are using suffix mapping
+      viewId = viewId.substring(0, viewId.lastIndexOf('.'))
+               + mapping.substring(mapping.indexOf('.'));
+      
       // we are extension mapped
       mServletPath = viewId;
       mPathInfo = null;
-      return;
+      
+      // Workaround Faces RI that has Servlet dependencies if this isn't set
+      mPortletRequest.setAttribute("javax.servlet.include.servlet_path", mServletPath);
+    }
+    else
+    {
+      // we are using prefix mapping
+      int j = mapping.lastIndexOf("/*");
+      if (j != -1)
+      {
+        mServletPath = mapping.substring(0, j);
+      }
+      else
+      {
+        // is it valid to omit the trailing /*????
+        mServletPath = mapping;
+      }
+
+      // Fail safe -- even if we didn't find a servlet mapping set path info
+      // as if we did as this value is all anything generally depends on
+      mPathInfo = viewId;
     }
 
-    // Otherwise we must be servlet mapped. Use the first path defined
-    // in mappings that isn't extension mapped
-    for (int i = 0; i < mappings.size(); i++)
-    {
-      String mapping = (String) mappings.elementAt(i);
-      if (mapping.startsWith("/"))
-      {
-        int j = mapping.lastIndexOf("/*");
-        if (j != -1)
-        {
-          mServletPath = mapping.substring(0, j);
-        }
-      }
-    }
-    // Fail safe -- even if we didn't find a servlet mapping set path info
-    // as if we did as this value is all anything generally depends on
-    mPathInfo = viewId;
   }
 
   private String extensionMappingFromViewId(String viewId)
   {
+    // first remove/ignore any querystring
+    int i = viewId.indexOf('?');
+    if (i != -1)
+    {
+      viewId = viewId.substring(0, i);
+    }
+     
     int extLoc = viewId.lastIndexOf('.');
 
     if (extLoc != -1 && extLoc > viewId.lastIndexOf('/'))
@@ -1211,6 +1250,26 @@ public class PortletExternalContextImpl extends ExternalContext
     return null;
   }
 
+  private void setFacesMapping()
+  {
+    String mapping = null;
+    String servletPath = this.getRequestServletPath();
+    
+    // if PathInfo == null we are suffixed mapped
+    if (this.getRequestPathInfo() == null)
+    {
+      mapping = servletPath.substring(servletPath.lastIndexOf('.'));
+      
+    }
+    else 
+    {
+      mapping = servletPath;
+    }
+    
+    this.getRequestMap().put("com.sun.faces.INVOCATION_PATH", mapping);
+  }
+  
+  
   private boolean isAbsoluteURL(String url)
   {
     if (url.startsWith("http"))
@@ -1308,7 +1367,6 @@ public class PortletExternalContextImpl extends ExternalContext
 
     if (prefixURL.length() != 0 && !prefixURL.startsWith("/"))
     {
-      log("PortletExternalContextImpl.encodeActionURL:end:in(" + url + ")");
       return null; // this shouldn't happen, if so just return
     }
 
