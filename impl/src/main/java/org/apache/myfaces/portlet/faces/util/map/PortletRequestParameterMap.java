@@ -14,7 +14,6 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
 
 package org.apache.myfaces.portlet.faces.util.map;
@@ -22,7 +21,6 @@ package org.apache.myfaces.portlet.faces.util.map;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -31,19 +29,19 @@ import javax.portlet.PortletRequest;
 /**
  * Map of portlet request params
  */
-public class PortletRequestParameterMap extends PortletAbstractMap
+public class PortletRequestParameterMap extends PortletAbstractMap<String>
 {
   private final PortletRequest mPortletRequest;
-  private final Map            mInternalAttributes;
+  private final Map<String, String> mInternalAttributes;
 
-  public PortletRequestParameterMap(Object request, Map internal)
+  public PortletRequestParameterMap(Object request, Map<String, String> internal)
   {
     if (request instanceof PortletRequest)
     {
       mPortletRequest = (PortletRequest) request;
       if (internal == null)
       {
-        mInternalAttributes = Collections.EMPTY_MAP;
+        mInternalAttributes = Collections.emptyMap();
       }
       else
       {
@@ -57,11 +55,11 @@ public class PortletRequestParameterMap extends PortletAbstractMap
   }
 
   @Override
-  public Object getAttribute(String key)
+  public String getAttribute(String key)
   {
     if (mPortletRequest != null)
     {
-      Object value = mInternalAttributes.get(key);
+      String value = mInternalAttributes.get(key);
       if (value != null)
       {
         return value;
@@ -76,7 +74,7 @@ public class PortletRequestParameterMap extends PortletAbstractMap
   }
 
   @Override
-  public void setAttribute(String key, Object value)
+  public void setAttribute(String key, String value)
   {
     throw new UnsupportedOperationException();
   }
@@ -87,25 +85,22 @@ public class PortletRequestParameterMap extends PortletAbstractMap
     throw new UnsupportedOperationException();
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  public Enumeration getAttributeNames()
+  public Enumeration<String> getAttributeNames()
   {
     if (mPortletRequest != null)
     {
       // merged list of internal parameters & request parameters
-      List attrNames = new ArrayList(5);
+      List<String> attrNames = new ArrayList<String>(5);
 
-      Enumeration requestAttrNames = mPortletRequest.getParameterNames();
+      Enumeration<String> requestAttrNames = mPortletRequest.getParameterNames();
       while (requestAttrNames.hasMoreElements())
       {
         attrNames.add(requestAttrNames.nextElement());
       }
-
-      for (Iterator i = mInternalAttributes.entrySet().iterator(); i.hasNext();)
-      {
-        Entry entry = (Entry) i.next();
-        attrNames.add(entry.getKey());
-      }
+      
+      attrNames.addAll(mInternalAttributes.keySet());
 
       return Collections.enumeration(attrNames);
     }

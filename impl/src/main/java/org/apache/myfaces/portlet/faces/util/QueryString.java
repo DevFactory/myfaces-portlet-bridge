@@ -20,7 +20,6 @@
 package org.apache.myfaces.portlet.faces.util;
 
 import java.io.UnsupportedEncodingException;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -36,9 +35,9 @@ public final class QueryString
 {
   private String mQueryString;
   private String mCharacterEncoding;
-  private Map    mParameterMap;
-  private List   mParameterList;
-  private List   mParameterNames;
+  private Map<String, List<Parameter>> mParameterMap;
+  private List<Parameter> mParameterList;
+  private List<String> mParameterNames;
 
   /**
    * Construct a <code>QueryString</code> from a pre-encoded string.
@@ -58,7 +57,7 @@ public final class QueryString
     mCharacterEncoding = source.mCharacterEncoding;
     if (source.mParameterList != null)
     {
-      mParameterList = new ArrayList(source.mParameterList);
+      mParameterList = new ArrayList<Parameter>(source.mParameterList);
     }
   }
 
@@ -85,14 +84,14 @@ public final class QueryString
   /**
    * Constructs a query string from a list of PRE-ENCODED name-value pairs
    */
-  public QueryString(List params, String characterEncoding)
+  public QueryString(List<String[]> params, String characterEncoding)
   {
     this(characterEncoding);
 
-    Iterator pairs = params.iterator();
-    while (pairs.hasNext())
+    for (String[] pair : params)
     {
-      String[] pair = (String[]) pairs.next();
+      // -= Simon Lessard =-
+      // FIXME: Add if (pair == null) check
       addParameter(pair[0], pair[1], true);
     }
   }
@@ -106,7 +105,7 @@ public final class QueryString
     // Use appendTo to concatenate the parameters together
     if (mQueryString == null)
     {
-      appendTo(new SimpleStringBuffer(200));
+      appendTo(new StringBuilder(200));
     }
     return mQueryString;
   }
@@ -117,42 +116,44 @@ public final class QueryString
    * @param buff
    *          the buffer to append to
    */
-  public void appendTo(SimpleStringBuffer buff)
+  public void appendTo(StringBuilder buff)
   {
-    // If we don't have a cached query string yet, generate it
     if (mQueryString == null)
     {
-      // Remember the start position in the buffer, so that we can also
-      // cache the
-      // concatenated string in mQueryString
-      int startPos = buff.length();
-      Iterator i;
-      if (mParameterList != null && (i = mParameterList.iterator()).hasNext())
+      // If we don't have a cached query string yet, generate it
+      if (mParameterList == null || mParameterList.isEmpty())
       {
-        Parameter param = (Parameter) i.next();
-        buff.append(param.getEncodedName()).append('=').append(param.getEncodedValue());
-        while (i.hasNext())
-        {
-          param = (Parameter) i.next();
-          buff.append('&').append(param.getEncodedName()).append('=')
-              .append(param.getEncodedValue());
-        }
-        mQueryString = buff.substring(startPos);
-      }
-      // If we don't have any parameters at all, cache the empty string
-      else
-      {
+        // If we don't have any parameters at all, cache the empty string
         mQueryString = "";
       }
+      else
+      {
+        // Remember the start position in the buffer, so that we can also
+        // cache the concatenated string in mQueryString
+        int startPos = buff.length();
+        
+        Iterator<Parameter> iter = mParameterList.iterator();
+        Parameter param = iter.next();
+        buff.append(param.getEncodedName()).append('=').append(param.getEncodedValue());
+        
+        while (iter.hasNext())
+        {
+          param = iter.next();
+          buff.append('&').append(param.getEncodedName()).append('=')
+            .append(param.getEncodedValue());
+        }
+          
+        mQueryString = buff.substring(startPos);
+      }
     }
-    // If we have a cached query string, reuse it
     else
     {
+      // If we have a cached query string, reuse it
       buff.append(mQueryString);
     }
   }
 
-  public Enumeration getParameterNames()
+  public Enumeration<String> getParameterNames()
   {
     initParameterMap();
     return Collections.enumeration(mParameterNames);
@@ -161,26 +162,26 @@ public final class QueryString
   public String getParameter(String name)
   {
     initParameterMap();
-    List values = (List) mParameterMap.get(name);
-    return values == null ? null : ((Parameter) values.get(0)).getValue();
+    List<Parameter> values = mParameterMap.get(name);
+    return values == null ? null : values.get(0).getValue();
   }
 
-  public Enumeration getParameterValues(String name)
+  public Enumeration<Object> getParameterValues(String name)
   {
     initParameterMap();
-    List params = (List) mParameterMap.get(name);
-    if (params == null)
+    List<Parameter> params = mParameterMap.get(name);
+    if (params == null || params.isEmpty())
     {
-      return Collections.enumeration(Collections.EMPTY_LIST);
+      List<Object> temp = Collections.emptyList();
+      return Collections.enumeration(temp);
     }
-    List values = new ArrayList(params.size());
-    Iterator i = params.iterator();
-    Parameter param;
-    while (i.hasNext())
+    
+    List<Object> values = new ArrayList<Object>(params.size());
+    for (Parameter param : params)
     {
-      param = (Parameter) i.next();
       values.add(param.getValue());
     }
+    
     return Collections.enumeration(values);
   }
 
@@ -208,15 +209,15 @@ public final class QueryString
     if (mParameterMap != null)
     {
       String decodedName = param.getName();
-      List values = (List) mParameterMap.get(decodedName);
+      List<Parameter> values = mParameterMap.get(decodedName);
       if (values == null)
       {
-        values = new ArrayList(4);
-        mParameterMap.put(decodedName, values);
-        // Only add UNIQUE parameter names (preserving order)
-        mParameterNames.add(decodedName);
+        createParameterList(param);
       }
-      values.add(param);
+      else
+      {
+        values.add(param);
+      }
     }
   }
 
@@ -240,13 +241,10 @@ public final class QueryString
     // Update the map
     Parameter param = new Parameter(name, value, isEncoded);
     String decodedName = param.getName();
-    List values = (List) mParameterMap.get(decodedName);
+    List<Parameter> values = mParameterMap.get(decodedName);
     if (values == null)
     {
-      values = new ArrayList(4);
-      mParameterMap.put(decodedName, values);
-      // Only add UNIQUE parameter names (preserving order)
-      mParameterNames.add(decodedName);
+      createParameterList(param);
       mParameterList.add(param);
     }
     else
@@ -263,8 +261,9 @@ public final class QueryString
       {
         mParameterList.remove(j);
       }
+      
+      values.add(param);
     }
-    values.add(param);
   }
 
   public String removeParameter(String name)
@@ -284,37 +283,54 @@ public final class QueryString
     Parameter templateParam = new Parameter(name, "", isEncoded);
 
     // Update the parameter list
-    Iterator i = mParameterList.iterator();
-    Parameter param = null, firstParam = null;
+    Iterator<Parameter> i = mParameterList.iterator();
+    Parameter firstParam = null;
     while (i.hasNext())
     {
-      param = (Parameter) i.next();
+      Parameter param = i.next();
       // Compare the parameter with our template (only the template name
-      // will
-      // be encoded / decoded if necessary)
+      // will be encoded / decoded if necessary)
       if (templateParam.equals(param))
       {
         if (firstParam == null)
         {
           firstParam = param;
         }
+        
         i.remove();
       }
     }
 
+    if (firstParam == null)
+    {
+      return null;
+    }
+
     // Update the map, if it is initialized and we found a parameter
-    if (mParameterMap != null && firstParam != null)
+    if (mParameterMap != null)
     {
       String decodedName = templateParam.getName();
-      List values = (List) mParameterMap.remove(decodedName);
+      List<Parameter> values = mParameterMap.remove(decodedName);
       if (values != null)
       {
         mParameterNames.remove(decodedName);
       }
     }
 
-    return firstParam == null ? null : isEncoded ? firstParam.getEncodedValue()
-                                                : firstParam.getValue();
+    return isEncoded ? firstParam.getEncodedValue() : firstParam.getValue();
+  }
+  
+  private void createParameterList(Parameter param)
+  {
+    String decodedName = param.getName();
+    
+    List<Parameter> values = new ArrayList<Parameter>(4);
+    mParameterMap.put(decodedName, values);
+    
+    // Only add UNIQUE parameter names (preserving order)
+    mParameterNames.add(decodedName);
+    
+    values.add(param);
   }
 
   private void initParameterMap()
@@ -323,29 +339,28 @@ public final class QueryString
     {
       initParameterList();
 
-      mParameterMap = new HashMap(30);
-      mParameterNames = new ArrayList(30);
-      if (mParameterList.size() == 0)
+      // TODO: Constants
+      mParameterMap = new HashMap<String, List<Parameter>>(30);
+      mParameterNames = new ArrayList<String>(30);
+      if (mParameterList.isEmpty())
       {
         return;
       }
+      
       String decodedName;
-      Parameter param;
-      List values;
-      Iterator i = mParameterList.iterator();
-      while (i.hasNext())
+      
+      for (Parameter param : mParameterList)
       {
-        param = (Parameter) i.next();
         decodedName = param.getName();
-        values = (List) mParameterMap.get(decodedName);
+        List<Parameter> values = mParameterMap.get(decodedName);
         if (values == null)
         {
-          values = new ArrayList(4);
-          mParameterMap.put(decodedName, values);
-          // Only add UNIQUE parameter names (preserving order)
-          mParameterNames.add(decodedName);
+          createParameterList(param);
         }
-        values.add(param);
+        else
+        {
+          values.add(param);
+        }
       }
     }
   }
@@ -354,7 +369,8 @@ public final class QueryString
   {
     if (mParameterList == null)
     {
-      mParameterList = new ArrayList(30);
+      // TODO: Constant
+      mParameterList = new ArrayList<Parameter>(30);
       int length;
       if (mQueryString == null || (length = mQueryString.length()) == 0)
       {
@@ -493,7 +509,7 @@ public final class QueryString
   private void handleUnsupportedEncoding()
   {
     throw new IllegalArgumentException(
-                                       new SimpleStringBuffer(100)
+                                       new StringBuilder(100)
                                                                   .append(
                                                                           "Unrecognized character encoding \"")
                                                                   .append(mCharacterEncoding)

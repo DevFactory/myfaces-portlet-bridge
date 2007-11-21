@@ -20,19 +20,19 @@
 package org.apache.myfaces.portlet.faces.context;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import javax.el.ELContext;
-
+import javax.faces.FacesException;
 import javax.faces.FactoryFinder;
 import javax.faces.application.Application;
 import javax.faces.application.ApplicationFactory;
 import javax.faces.application.FacesMessage;
 import javax.faces.component.UIViewRoot;
-import javax.faces.FacesException;
 import javax.faces.context.ExternalContext;
 import javax.faces.context.FacesContext;
 import javax.faces.context.ResponseStream;
@@ -40,9 +40,7 @@ import javax.faces.context.ResponseWriter;
 import javax.faces.lifecycle.Lifecycle;
 import javax.faces.render.RenderKit;
 import javax.faces.render.RenderKitFactory;
-
 import javax.portlet.PortletResponse;
-
 import javax.portlet.faces.Bridge;
 import javax.portlet.faces.component.PortletNamingContainer;
 
@@ -61,9 +59,9 @@ public class PortletFacesContextImpl extends FacesContext
   private UIViewRoot            mViewRoot;
   private boolean               mRenderResponse   = false;
   private boolean               mResponseComplete = false;
-  private Map                   mMessages         = new HashMap();
   private FacesMessage.Severity mMaximumSeverity  = FacesMessage.SEVERITY_INFO;
   private ELContext             mElContext        = null;
+  private Map<String, List<FacesMessage>> mMessages = new HashMap<String, List<FacesMessage>>();
 
   public PortletFacesContextImpl(ExternalContext externalContext, Lifecycle lifecycle)
                                                                                       throws FacesException
@@ -158,15 +156,14 @@ public class PortletFacesContextImpl extends FacesContext
   }
 
   @Override
-  public Iterator getMessages()
+  public Iterator<FacesMessage> getMessages()
   {
-    List results = new ArrayList();
-    Iterator clientIds = mMessages.keySet().iterator();
-    while (clientIds.hasNext())
+    List<FacesMessage> results = new ArrayList<FacesMessage>();
+    for (List<FacesMessage> messages : mMessages.values())
     {
-      String clientId = (String) clientIds.next();
-      results.addAll((List) mMessages.get(clientId));
+      results.addAll(messages);
     }
+    
     return results.iterator();
   }
 
@@ -177,19 +174,20 @@ public class PortletFacesContextImpl extends FacesContext
   }
 
   @Override
-  public Iterator getClientIdsWithMessages()
+  public Iterator<String> getClientIdsWithMessages()
   {
     return mMessages.keySet().iterator();
   }
 
   @Override
-  public Iterator getMessages(String clientId)
+  public Iterator<FacesMessage> getMessages(String clientId)
   {
-    List list = (List) mMessages.get(clientId);
+    List<FacesMessage> list = mMessages.get(clientId);
     if (list == null)
     {
-      list = new ArrayList();
+      list = Collections.emptyList();
     }
+    
     return list.iterator();
   }
 
@@ -294,14 +292,18 @@ public class PortletFacesContextImpl extends FacesContext
     {
       throw new NullPointerException();
     }
-    List list = (List) mMessages.get(clientId);
+    
+    List<FacesMessage> list = mMessages.get(clientId);
     if (list == null)
     {
-      list = new ArrayList();
+      list = new ArrayList<FacesMessage>(2); // default capacity of 10 is an overkill
       mMessages.put(clientId, list);
     }
     list.add(message);
 
+    // -= Simon Lessard =-
+    // FIXME: This is wrong, FacesMessage.setSeverity can be called later making
+    //        this cached result potentially incoherent.
     FacesMessage.Severity severity = message.getSeverity();
     if (severity != null && severity.compareTo(mMaximumSeverity) > 0)
     {

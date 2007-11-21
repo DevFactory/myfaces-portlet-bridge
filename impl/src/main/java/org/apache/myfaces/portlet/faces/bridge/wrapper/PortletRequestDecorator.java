@@ -20,6 +20,8 @@
 package org.apache.myfaces.portlet.faces.bridge.wrapper;
 
 import java.util.Enumeration;
+import java.util.Locale;
+import java.util.Map;
 
 import javax.portlet.PortalContext;
 import javax.portlet.PortletMode;
@@ -198,7 +200,8 @@ public class PortletRequestDecorator implements PortletRequest
    * @exception java.lang.IllegalArgumentException
    *              if name is <code>null</code>.
    */
-  public java.util.Enumeration getProperties(String name)
+  @SuppressWarnings("unchecked")
+  public Enumeration<String> getProperties(String name)
   {
     return mRequest.getProperties(name);
   }
@@ -212,7 +215,8 @@ public class PortletRequestDecorator implements PortletRequest
    * @return an <code>Enumeration</code> of all the property names sent with this request; if the
    *         request has no properties, an empty <code>Enumeration</code>.
    */
-  public java.util.Enumeration getPropertyNames()
+  @SuppressWarnings("unchecked")
+  public Enumeration<String> getPropertyNames()
   {
     return mRequest.getPropertyNames();
   }
@@ -237,7 +241,7 @@ public class PortletRequestDecorator implements PortletRequest
    *         comparison) indicating the authentication scheme, a custom one, or <code>null</code>
    *         if the request was not authenticated.
    */
-  public java.lang.String getAuthType()
+  public String getAuthType()
   {
     return mRequest.getAuthType();
   }
@@ -269,7 +273,7 @@ public class PortletRequestDecorator implements PortletRequest
    *         <code>null</code> if the user login is not known.
    * 
    */
-  public java.lang.String getRemoteUser()
+  public String getRemoteUser()
   {
     return mRequest.getRemoteUser();
   }
@@ -296,7 +300,7 @@ public class PortletRequestDecorator implements PortletRequest
    * @return a <code>boolean</code> indicating whether the user making this request belongs to a
    *         given role; <code>false</code> if the user has not been authenticated.
    */
-  public boolean isUserInRole(java.lang.String role)
+  public boolean isUserInRole(String role)
   {
     return mRequest.isUserInRole(role);
   }
@@ -336,7 +340,8 @@ public class PortletRequestDecorator implements PortletRequest
    *         attributes, or an empty <code>Enumeration</code> if the request has no attributes
    *         available to it.
    */
-  public java.util.Enumeration getAttributeNames()
+  @SuppressWarnings("unchecked")
+  public Enumeration<String> getAttributeNames()
   {
     return mRequest.getAttributeNames();
   }
@@ -385,7 +390,8 @@ public class PortletRequestDecorator implements PortletRequest
    *         <code>String</code> containing the name of a request parameter; or an empty
    *         <code>Enumeration</code> if the request has no parameters.
    */
-  public Enumeration getParameterNames()
+  @SuppressWarnings("unchecked")
+  public Enumeration<String> getParameterNames()
   {
     return mRequest.getParameterNames();
   }
@@ -429,7 +435,8 @@ public class PortletRequestDecorator implements PortletRequest
    *         parameter map are of type String. The values in the parameter map are of type String
    *         array (<code>String[]</code>).
    */
-  public java.util.Map getParameterMap()
+  @SuppressWarnings("unchecked")
+  public Map<String, String[]> getParameterMap()
   {
     return mRequest.getParameterMap();
   }
@@ -553,7 +560,8 @@ public class PortletRequestDecorator implements PortletRequest
    * 
    * @return ordered list of MIME types for the response
    */
-  public java.util.Enumeration getResponseContentTypes()
+  @SuppressWarnings("unchecked")
+  public Enumeration<String> getResponseContentTypes()
   {
     return mRequest.getResponseContentTypes();
   }
@@ -564,7 +572,7 @@ public class PortletRequestDecorator implements PortletRequest
    * 
    * @return the prefered Locale in which the portal will accept content.
    */
-  public java.util.Locale getLocale()
+  public Locale getLocale()
   {
     return mRequest.getLocale();
   }
@@ -577,7 +585,8 @@ public class PortletRequestDecorator implements PortletRequest
    * @return an Enumeration of Locales, in decreasing order, in which the portal will accept content
    *         for this request
    */
-  public java.util.Enumeration getLocales()
+  @SuppressWarnings("unchecked")
+  public Enumeration<Locale> getLocales()
   {
     return mRequest.getLocales();
   }

@@ -14,7 +14,6 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
 
 package org.apache.myfaces.portlet.faces.util.map;
@@ -26,7 +25,7 @@ import javax.portlet.PortletRequest;
 /**
  * Map of portlet request attributes
  */
-public class PortletRequestMap extends PortletAbstractMap
+public class PortletRequestMap extends PortletAbstractMap<Object>
 {
   private final PortletRequest mPortletRequest;
 
@@ -60,9 +59,7 @@ public class PortletRequestMap extends PortletAbstractMap
   {
     if (mPortletRequest != null)
     {
-
       mPortletRequest.setAttribute(key, value);
-
     }
   }
 
@@ -75,8 +72,9 @@ public class PortletRequestMap extends PortletAbstractMap
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  public Enumeration getAttributeNames()
+  public Enumeration<String> getAttributeNames()
   {
     if (mPortletRequest != null)
     {

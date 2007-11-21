@@ -21,20 +21,19 @@ package org.apache.myfaces.portlet.faces.bridge.wrapper;
 
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 
 import javax.portlet.RenderRequest;
 
 public class BridgeRenderRequestWrapper extends RenderRequestDecorator
 {
-  private Map mActionParams     = null;
-  private Map mCombinedParamMap = null;
+  private Map<String, String[]> mActionParams     = null;
+  private Map<String, String[]> mCombinedParamMap = null;
 
-  public BridgeRenderRequestWrapper(RenderRequest request, Map actionParams)
-                                                                            throws IllegalArgumentException
+  public BridgeRenderRequestWrapper(RenderRequest request, 
+                                    Map<String, String[]> actionParams)
+                                      throws IllegalArgumentException
   {
     super(request);
 
@@ -95,23 +94,9 @@ public class BridgeRenderRequestWrapper extends RenderRequestDecorator
    *         <code>Enumeration</code> if the request has no parameters.
    */
   @Override
-  public Enumeration getParameterNames()
+  public Enumeration<String> getParameterNames()
   {
-    final Enumeration e = Collections.enumeration(getParameterMap().entrySet());
-    Enumeration en = new Enumeration() {
-      public boolean hasMoreElements()
-      {
-        return e.hasMoreElements();
-      }
-
-      public Object nextElement()
-      {
-        Map.Entry entry = (Map.Entry) e.nextElement();
-        return entry.getKey();
-      }
-    };
-
-    return en;
+    return Collections.enumeration(getParameterMap().keySet());
   }
 
   /**
@@ -142,7 +127,7 @@ public class BridgeRenderRequestWrapper extends RenderRequestDecorator
       throw new IllegalArgumentException();
     }
 
-    return (String[]) getParameterMap().get(name);
+    return getParameterMap().get(name);
 
   }
 
@@ -159,40 +144,34 @@ public class BridgeRenderRequestWrapper extends RenderRequestDecorator
    *         parameter map are of type String. The values in the parameter map are of type String
    *         array (<code>String[]</code>).
    */
+  @SuppressWarnings("unchecked")
   @Override
-  public java.util.Map getParameterMap()
+  public Map<String, String[]> getParameterMap()
   {
-    if (mActionParams != null && !mActionParams.isEmpty())
-    {
-      if (mCombinedParamMap == null)
-      {
-        mCombinedParamMap = new LinkedHashMap(getParent().getParameterMap());
-
-        // now walk through the actionParams adding those that aren't
-        // already in the ParameterMap
-        Set s = mActionParams.entrySet();
-        if (s != null)
-        {
-          Iterator entries = s.iterator();
-          while (entries != null && entries.hasNext())
-          {
-            Map.Entry entry = (Map.Entry) entries.next();
-            String key = (String) entry.getKey();
-            if (!mCombinedParamMap.containsKey(key))
-            {
-              mCombinedParamMap.put(key, entry.getValue());
-            }
-          }
-          // now make this an immutable Map
-          mCombinedParamMap = Collections.unmodifiableMap(mCombinedParamMap);
-        }
-      }
-      return mCombinedParamMap;
-    }
-    else
+    if (mActionParams == null || mActionParams.isEmpty())
     {
       return null;
     }
-  }
+    
+    if (mCombinedParamMap == null)
+    {
+      mCombinedParamMap = new LinkedHashMap<String, String[]>(getParent().getParameterMap());
 
+      // now walk through the actionParams adding those that aren't
+      // already in the ParameterMap
+      for (Map.Entry<String, String[]> entry : mActionParams.entrySet())
+      {
+        String key = entry.getKey();
+        if (!mCombinedParamMap.containsKey(key))
+        {
+          mCombinedParamMap.put(key, entry.getValue());
+        }
+      }
+      
+      // now make this an immutable Map
+      mCombinedParamMap = Collections.unmodifiableMap(mCombinedParamMap);
+    }
+    
+    return mCombinedParamMap;
+  }
 }

@@ -20,11 +20,10 @@
 package org.apache.myfaces.portlet.faces.util.config;
 
 import java.io.StringReader;
-
-import java.util.Vector;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.portlet.PortletContext;
-
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
@@ -33,12 +32,13 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
+//TODO: This is probably better under the Bridge package as a package private utility
+//TODO: This is probably better as a static utility class since it's never kept around.
 public class WebConfigurationProcessor
 {
 
   private static final String WEB_XML_PATH = "/WEB-INF/web.xml";
-
-  private Vector              mMappings    = null;
+  private List<String> mMappings = null;
 
   /**
    * <p>
@@ -52,19 +52,15 @@ public class WebConfigurationProcessor
    */
   public WebConfigurationProcessor(PortletContext context)
   {
-
     if (context != null)
     {
       scanForFacesMappings(context);
     }
-
   } // END WebXmlProcessor
 
-  public Vector getFacesMappings()
+  public List<String> getFacesMappings()
   {
-
     return mMappings;
-
   } // END getFacesMappings
 
   /**
@@ -138,7 +134,7 @@ public class WebConfigurationProcessor
     private String              mClass                   = null;
 
     private String              mFacesServletName        = null;
-    private StringBuffer        mContent;
+    private StringBuilder       mContent;
 
     @Override
     public InputSource resolveEntity(String publicId, String systemId) throws SAXException
@@ -187,7 +183,7 @@ public class WebConfigurationProcessor
       }
       if (parseContent)
       {
-        mContent = new StringBuffer();
+        mContent = new StringBuilder();
       }
 
     } // END startElement
@@ -224,7 +220,7 @@ public class WebConfigurationProcessor
         {
           if (mMappings == null)
           {
-            mMappings = new Vector();
+            mMappings = new ArrayList<String>();
           }
           mMappings.add(mContent.toString().trim());
         }

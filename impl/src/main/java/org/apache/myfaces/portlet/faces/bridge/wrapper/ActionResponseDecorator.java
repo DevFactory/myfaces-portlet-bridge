@@ -19,6 +19,8 @@
 
 package org.apache.myfaces.portlet.faces.bridge.wrapper;
 
+import java.util.Map;
+
 import javax.portlet.ActionResponse;
 import javax.portlet.PortletMode;
 import javax.portlet.PortletModeException;
@@ -164,7 +166,8 @@ public class ActionResponseDecorator extends PortletResponseDecorator implements
    * @exception java.lang.IllegalStateException
    *              if the method is invoked after <code>sendRedirect</code> has been called.
    */
-  public void setRenderParameters(java.util.Map parameters)
+  // FIXME: When portlet API is Java 5 compliant, fix this generic issue
+  public void setRenderParameters(Map parameters)
   {
     // mResponse is a protected memeber of PortletResponseDecorator
     ((ActionResponse) mResponse).setRenderParameters(parameters);

@@ -14,13 +14,13 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
 
 package org.apache.myfaces.portlet.faces.util.map;
 
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Map;
 
 import javax.portlet.PortletRequest;
@@ -30,7 +30,7 @@ import javax.portlet.faces.Bridge;
 /**
  * Map of portlet session attributes
  */
-public class PortletSessionMap extends PortletAbstractMap
+public class PortletSessionMap extends PortletAbstractMap<Object>
 {
 
   private final PortletRequest mPortletRequest;
@@ -100,15 +100,23 @@ public class PortletSessionMap extends PortletAbstractMap
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  protected Enumeration getAttributeNames()
+  protected Enumeration<String> getAttributeNames()
   {
     if (mPortletRequest != null)
     {
       PortletSession portletSession = mPortletRequest.getPortletSession(false);
-      ;
-      return portletSession == null ? Collections.enumeration(Collections.EMPTY_LIST)
-                                   : portletSession.getAttributeNames(mScope);
+      
+      if (portletSession == null)
+      {
+        List<String> dummy = Collections.emptyList();
+        return Collections.enumeration(dummy);
+      }
+      else
+      {
+        return portletSession.getAttributeNames(mScope);
+      }
     }
     else
     {
@@ -116,20 +124,23 @@ public class PortletSessionMap extends PortletAbstractMap
     }
   }
 
-  private Map getAppScopeMap(PortletSession portletSession)
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> getAppScopeMap(PortletSession portletSession)
   {
     if (mScope != PortletSession.PORTLET_SCOPE)
     {
       return null;
     }
 
-    Map m = (Map) portletSession.getAttribute(Bridge.APPLICATION_SCOPE_MAP);
+    Map<String, Object> m = 
+      (Map<String, Object>)portletSession.getAttribute(Bridge.APPLICATION_SCOPE_MAP);
 
     if (m == null)
     {
       m = new PortletSessionMap(mPortletRequest, PortletSession.APPLICATION_SCOPE);
       portletSession.setAttribute(Bridge.APPLICATION_SCOPE_MAP, m);
     }
+    
     return m;
   }
 

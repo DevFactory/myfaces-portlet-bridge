@@ -26,7 +26,7 @@ import javax.portlet.PortletContext;
 /**
  * Map of portlet context attributes
  */
-public class PortletApplicationMap extends PortletAbstractMap
+public class PortletApplicationMap extends PortletAbstractMap<Object>
 {
   private final PortletContext mPortletContext;
 
@@ -73,8 +73,9 @@ public class PortletApplicationMap extends PortletAbstractMap
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  public Enumeration getAttributeNames()
+  public Enumeration<String> getAttributeNames()
   {
     if (mPortletContext != null)
     {

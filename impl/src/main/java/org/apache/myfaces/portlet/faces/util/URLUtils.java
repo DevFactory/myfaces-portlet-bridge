@@ -25,7 +25,7 @@ public class URLUtils
   /**
    * Borrowed from package oracle.adfinternal.view.faces.share.url.EncoderUtils
    */
-  public static String appendURLArguments(StringBuffer buffer, String baseURL,
+  public static String appendURLArguments(StringBuilder buffer, String baseURL,
                                           String[] keysAndValues)
   {
 
@@ -86,7 +86,7 @@ public class URLUtils
       }
     }
 
-    StringBuffer buffer = new StringBuffer(bufferLength);
+    StringBuilder buffer = new StringBuilder(bufferLength);
 
     return appendURLArguments(buffer, baseURL, keysAndValues);
   }
@@ -116,7 +116,7 @@ public class URLUtils
       }
     }
 
-    StringBuffer sb = new StringBuffer(currentPath);
+    StringBuilder sb = new StringBuilder(currentPath);
     if (currentPath.endsWith("/"))
     {
       sb = sb.deleteCharAt(currentPath.length() - 1);

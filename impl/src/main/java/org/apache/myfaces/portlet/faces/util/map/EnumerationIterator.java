@@ -22,27 +22,35 @@ package org.apache.myfaces.portlet.faces.util.map;
 import java.util.Enumeration;
 import java.util.Iterator;
 
-public class LocalesIterator implements Iterator
+public class EnumerationIterator<T extends Object> implements Iterator<T>, Iterable<T>
 {
-  private Enumeration mLocales;
+  private Enumeration<T> mEnumeration;
 
-  public LocalesIterator(Enumeration locales)
+  public EnumerationIterator(Enumeration<T> enumeration)
   {
-    mLocales = locales;
+    mEnumeration = enumeration;
   }
 
   public boolean hasNext()
   {
-    return mLocales.hasMoreElements();
+    return mEnumeration.hasMoreElements();
   }
 
-  public Object next()
+  public T next()
   {
-    return mLocales.nextElement();
+    return mEnumeration.nextElement();
   }
 
   public void remove()
   {
     throw new UnsupportedOperationException();
   }
+
+  /**
+   * This makes java5 style for-looping much easier.
+   */
+	public Iterator<T> iterator()
+	{
+		return this;
+	}
 }

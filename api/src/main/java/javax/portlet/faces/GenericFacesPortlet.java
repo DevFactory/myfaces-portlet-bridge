@@ -62,12 +62,13 @@ public class GenericFacesPortlet extends GenericPortlet
                                                         + "BridgeImplClass";
   public static final String BRIDGE_SERVICE_CLASSPATH = "/META-INF/services/javax.portlet.faces.Bridge";
 
-  private Class              mFacesBridgeClass        = null;
-  private Bridge             mFacesBridge             = null;
+  private Class<? extends Bridge> mFacesBridgeClass   = null;
+  private Bridge                  mFacesBridge        = null;
 
   /**
    * Initialize generic faces portlet from portlet.xml
    */
+  @SuppressWarnings("unchecked")
   @Override
   public void init(PortletConfig portletConfig) throws PortletException
   {
@@ -81,7 +82,8 @@ public class GenericFacesPortlet extends GenericPortlet
     {
       try
       {
-        mFacesBridgeClass = Thread.currentThread().getContextClassLoader().loadClass(bridgeClassName);
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        mFacesBridgeClass = (Class<? extends Bridge>)loader.loadClass(bridgeClassName);
       }
       catch (ClassNotFoundException cnfe)
       {
@@ -291,7 +293,7 @@ public class GenericFacesPortlet extends GenericPortlet
     {
       try
       {
-        mFacesBridge = (Bridge) mFacesBridgeClass.newInstance();
+        mFacesBridge = mFacesBridgeClass.newInstance();
         mFacesBridge.init(getPortletConfig());
       }
       catch (Exception e)

@@ -22,36 +22,42 @@ package org.apache.myfaces.portlet.faces.context;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
-
 import java.net.MalformedURLException;
 import java.net.URL;
-
 import java.security.Principal;
-
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.Vector;
 
 import javax.faces.FacesException;
+import javax.faces.application.ViewHandler;
 import javax.faces.context.ExternalContext;
-
 import javax.portlet.ActionRequest;
 import javax.portlet.ActionResponse;
 import javax.portlet.PortletConfig;
 import javax.portlet.PortletContext;
 import javax.portlet.PortletException;
+import javax.portlet.PortletMode;
 import javax.portlet.PortletRequest;
 import javax.portlet.PortletRequestDispatcher;
 import javax.portlet.PortletResponse;
 import javax.portlet.PortletURL;
 import javax.portlet.RenderRequest;
 import javax.portlet.RenderResponse;
+import javax.portlet.WindowState;
+import javax.portlet.faces.Bridge;
+import javax.portlet.faces.BridgeDefaultViewNotSpecifiedException;
+import javax.portlet.faces.BridgeUtil;
 
-import org.apache.myfaces.portlet.faces.util.map.LocalesIterator;
+import org.apache.myfaces.portlet.faces.util.QueryString;
+import org.apache.myfaces.portlet.faces.util.URLUtils;
+import org.apache.myfaces.portlet.faces.util.map.EnumerationIterator;
 import org.apache.myfaces.portlet.faces.util.map.PortletApplicationMap;
 import org.apache.myfaces.portlet.faces.util.map.PortletInitParameterMap;
 import org.apache.myfaces.portlet.faces.util.map.PortletRequestHeaderMap;
@@ -61,22 +67,6 @@ import org.apache.myfaces.portlet.faces.util.map.PortletRequestMap;
 import org.apache.myfaces.portlet.faces.util.map.PortletRequestParameterMap;
 import org.apache.myfaces.portlet.faces.util.map.PortletRequestParameterValuesMap;
 import org.apache.myfaces.portlet.faces.util.map.PortletSessionMap;
-import org.apache.myfaces.portlet.faces.util.QueryString;
-import org.apache.myfaces.portlet.faces.util.URLUtils;
-
-import java.util.Vector;
-
-import javax.faces.application.ViewHandler;
-
-import javax.faces.context.FacesContext;
-
-import javax.portlet.PortletMode;
-import javax.portlet.WindowState;
-import javax.portlet.faces.Bridge;
-
-import javax.portlet.faces.BridgeDefaultViewNotSpecifiedException;
-import javax.portlet.faces.BridgeUtil;
-
 /**
  * This implementation of {@link ExternalContext} is specific to the portlet implementation.
  * 
@@ -113,19 +103,19 @@ public class PortletExternalContextImpl extends ExternalContext
   private PortletResponse       mOrigPortletResponse               = null;
 
   // External context maps
-  private Map                   mApplicationMap                    = null;
-  private Map                   mSessionMap                        = null;
-  private Map                   mRequestMap                        = null;
-  private Map                   mRequestParameterMap               = null;
-  private Map                   mRequestParameterValuesMap         = null;
-  private Map                   mRequestHeaderMap                  = null;
-  private Map                   mRequestHeaderValuesMap            = null;
-  private Map                   mInitParameterMap                  = null;
+  private Map<String, Object>   mApplicationMap                    = null;
+  private Map<String, Object>   mSessionMap                        = null;
+  private Map<String, Object>   mRequestMap                        = null;
+  private Map<String, String>   mRequestParameterMap               = null;
+  private Map<String, String[]> mRequestParameterValuesMap         = null;
+  private Map<String, String>   mRequestHeaderMap                  = null;
+  private Map<String, String[]> mRequestHeaderValuesMap            = null;
+  private Map<String, String>   mInitParameterMap                  = null;
 
   // maps for internal parameters (eg, those specified in query string of
   // any defaultViewId)
-  private Map                   mInternalRequestParameterMap       = Collections.EMPTY_MAP;
-  private Map                   mInternalRequestParameterValuesMap = Collections.EMPTY_MAP;
+  private Map<String, String>   mInternalRequestParameterMap       = Collections.emptyMap();
+  private Map<String, String[]> mInternalRequestParameterValuesMap = Collections.emptyMap();
 
   private PortletRequestHeaders mPortletRequestHeaders             = null;
 
@@ -133,13 +123,14 @@ public class PortletExternalContextImpl extends ExternalContext
   private String                mViewId                            = null;
 
   // Reverse engineered serlvet paths from mappings
-  private Vector                mFacesMappings                     = null;
+  private List<String>          mFacesMappings                     = null;
   private String                mServletPath                       = null;
   private String                mPathInfo                          = null;
 
   // Current Portlet phase
   private Bridge.PortletPhase   mPhase                             = null;
 
+  @SuppressWarnings("unchecked")
   public PortletExternalContextImpl(PortletConfig portletConfig, PortletRequest portletRequest,
                                     PortletResponse portletResponse) throws FacesException
   {
@@ -156,7 +147,7 @@ public class PortletExternalContextImpl extends ExternalContext
     
     // Now reverse engineer the servlet paths from the mappings 
     // So Faces thinks was a client request
-    mFacesMappings = (Vector) mPortletRequest.getAttribute(FACES_MAPPING_ATTRIBUTE);
+    mFacesMappings = (Vector<String>) mPortletRequest.getAttribute(FACES_MAPPING_ATTRIBUTE);
     mapPathsFromViewId(mViewId, mFacesMappings);
 
 
@@ -172,12 +163,11 @@ public class PortletExternalContextImpl extends ExternalContext
     // itself because its a per portlet setting but without the config
     // object
     // the ViewHandler has no way to get the portlet's name.
-    Bridge.BridgeRenderPolicy renderPolicy = (Bridge.BridgeRenderPolicy) mPortletContext
-                                                                                        .getAttribute(Bridge.BRIDGE_PACKAGE_PREFIX
-                                                                                                      + mPortletConfig
-                                                                                                                      .getPortletName()
-                                                                                                      + "."
-                                                                                                      + Bridge.RENDER_POLICY);
+    Bridge.BridgeRenderPolicy renderPolicy = 
+      (Bridge.BridgeRenderPolicy) mPortletContext.getAttribute(Bridge.BRIDGE_PACKAGE_PREFIX
+                                                               + mPortletConfig.getPortletName()
+                                                               + "."
+                                                               + Bridge.RENDER_POLICY);
     if (renderPolicy != null)
     {
       mPortletRequest.setAttribute(RENDER_POLICY_ATTRIBUTE, renderPolicy);
@@ -287,7 +277,7 @@ public class PortletExternalContextImpl extends ExternalContext
       // Add extra parameters so they don't get lost
       if (queryStr != null)
       {
-        Enumeration list = queryStr.getParameterNames();
+        Enumeration<String> list = queryStr.getParameterNames();
         while (list.hasMoreElements())
         {
           String param = list.nextElement().toString();
@@ -346,10 +336,10 @@ public class PortletExternalContextImpl extends ExternalContext
       // set other request params (if any) into navigational states
       if (queryStr != null)
       {
-        Enumeration list = queryStr.getParameterNames();
+        Enumeration<String> list = queryStr.getParameterNames();
         while (list.hasMoreElements())
         {
-          String param = list.nextElement().toString();
+          String param = list.nextElement();
           if (param.equals(Bridge.PORTLET_MODE_PARAMETER))
           {
             try 
@@ -358,6 +348,13 @@ public class PortletExternalContextImpl extends ExternalContext
             }
             catch (Exception e)
             {
+            	//TODO: Ignoring is probably dangerous here as it means that we are
+            	//      EITHER using exceptions for flow control (which is extreemly
+            	//      inefficient) or we should log a message saying what the issue
+            	//      is.  According to the Javadocs an exception is thrown here if the
+            	//      portlet mode is not allowed or if sendRedirect has already been
+            	//      called.  In either case we should log an information type message
+            	//      here.
               ; // do nothing -- just ignore
             }
           }
@@ -506,7 +503,7 @@ public class PortletExternalContextImpl extends ExternalContext
   }
 
   @Override
-  public Map getApplicationMap()
+  public Map<String, Object> getApplicationMap()
   {
     if (mApplicationMap == null)
     {
@@ -516,7 +513,7 @@ public class PortletExternalContextImpl extends ExternalContext
   }
 
   @Override
-  public Map getSessionMap()
+  public Map<String, Object> getSessionMap()
   {
     if (mSessionMap == null)
     {
@@ -526,7 +523,7 @@ public class PortletExternalContextImpl extends ExternalContext
   }
 
   @Override
-  public Map getRequestMap()
+  public Map<String, Object> getRequestMap()
   {
     if (mRequestMap == null)
     {
@@ -536,19 +533,17 @@ public class PortletExternalContextImpl extends ExternalContext
   }
 
   @Override
-  public Map getRequestParameterMap()
+  public Map<String, String> getRequestParameterMap()
   {
     if (mRequestParameterMap == null)
     {
-      mRequestParameterMap = Collections
-                                        .unmodifiableMap(new PortletRequestParameterMap(
-                                                                                        mPortletRequest,
-                                                                                        mInternalRequestParameterMap));
+      mRequestParameterMap = Collections.unmodifiableMap(new PortletRequestParameterMap(                                                                                        mPortletRequest,
+                                                                                       mInternalRequestParameterMap));
     }
     return mRequestParameterMap;
   }
 
-  public Map getRequestParameterValuesMap()
+  public Map<String, String[]> getRequestParameterValuesMap()
   {
     if (mRequestParameterValuesMap == null)
     {
@@ -560,32 +555,13 @@ public class PortletExternalContextImpl extends ExternalContext
     return mRequestParameterValuesMap;
   }
 
-  public Iterator getRequestParameterNames()
+  public Iterator<String> getRequestParameterNames()
   {
-    Map requestParameters = getRequestParameterMap();
-    final Iterator i = requestParameters.entrySet().iterator();
-    Iterator it = new Iterator() {
-      public boolean hasNext()
-      {
-        return i.hasNext();
-      }
-
-      public Object next()
-      {
-        Map.Entry entry = (Map.Entry) i.next();
-        return entry.getKey();
-      }
-
-      public void remove()
-      {
-        throw new UnsupportedOperationException();
-      }
-    };
-
-    return it;
+  	//Map is unmodifiable, so the iterator will be as well
+  	return getRequestParameterMap().keySet().iterator();
   }
 
-  public Map getRequestHeaderMap()
+  public Map<String, String> getRequestHeaderMap()
   {
     if (mRequestHeaderMap == null)
     {
@@ -599,7 +575,8 @@ public class PortletExternalContextImpl extends ExternalContext
     return mRequestHeaderMap;
   }
 
-  public Map getRequestHeaderValuesMap()
+  @Override
+  public Map<String, String[]> getRequestHeaderValuesMap()
   {
     if (mRequestHeaderValuesMap == null)
     {
@@ -613,32 +590,39 @@ public class PortletExternalContextImpl extends ExternalContext
     return mRequestHeaderValuesMap;
   }
 
-  public Map getRequestCookieMap()
+  @Override
+  public Map<String, Object> getRequestCookieMap()
   {
-    return Collections.unmodifiableMap(Collections.EMPTY_MAP);
+    Map<String, Object> dummy = Collections.emptyMap();
+    return dummy;
   }
 
+  @Override
   public Locale getRequestLocale()
   {
     return mPortletRequest.getLocale();
   }
 
+  @Override
   public String getRequestPathInfo()
   {
     return mPathInfo;
   }
 
+  @Override
   public String getRequestContextPath()
   {
     return mPortletRequest.getContextPath();
   }
 
+  @Override
   public String getInitParameter(String s)
   {
     return mPortletContext.getInitParameter(s);
   }
 
-  public Map getInitParameterMap()
+  @Override
+  public Map<String, String> getInitParameterMap()
   {
     if (mInitParameterMap == null)
     {
@@ -647,7 +631,8 @@ public class PortletExternalContextImpl extends ExternalContext
     return mInitParameterMap;
   }
 
-  public Set getResourcePaths(String s)
+  @SuppressWarnings("unchecked")
+	public Set<String> getResourcePaths(String s)
   {
     return mPortletContext.getResourcePaths(s);
   }
@@ -669,46 +654,57 @@ public class PortletExternalContextImpl extends ExternalContext
     }
   }
 
+  @Override
   public String getRequestServletPath()
   {
     return mServletPath;
   }
 
+  @Override
   public String getAuthType()
   {
     return mPortletRequest.getAuthType();
   }
 
+  @Override
   public String getRemoteUser()
   {
     return mPortletRequest.getRemoteUser();
   }
 
+  @Override
   public boolean isUserInRole(String role)
   {
     return mPortletRequest.isUserInRole(role);
   }
 
+  @Override
   public Principal getUserPrincipal()
   {
     return mPortletRequest.getUserPrincipal();
   }
 
+  @Override
   public void log(String message)
   {
     mPortletContext.log(message);
   }
 
+  @Override
   public void log(String message, Throwable t)
   {
     mPortletContext.log(message, t);
   }
 
-  public Iterator getRequestLocales()
+  @SuppressWarnings("unchecked")
+  @Override
+  public Iterator<Locale> getRequestLocales()
   {
-    return new LocalesIterator(mPortletRequest.getLocales());
+  	//TODO: Cache this value...
+    return new EnumerationIterator<Locale>(mPortletRequest.getLocales());
   }
 
+  @Override
   public URL getResource(String s) throws MalformedURLException
   {
     return mPortletContext.getResource(s);
@@ -730,6 +726,7 @@ public class PortletExternalContextImpl extends ExternalContext
    * 
    * @since 1.2
    */
+  @Override
   public void setRequest(Object request)
   {
     mPortletRequest = (PortletRequest) request;
@@ -775,6 +772,7 @@ public class PortletExternalContextImpl extends ExternalContext
    * @since 1.2
    * 
    */
+  @Override
   public void setRequestCharacterEncoding(String encoding) throws UnsupportedEncodingException,
                                                           IllegalStateException
   {
@@ -811,6 +809,7 @@ public class PortletExternalContextImpl extends ExternalContext
    * @since 1.2
    * 
    */
+  @Override
   public String getRequestCharacterEncoding()
   {
     if (mPhase == Bridge.PortletPhase.RenderPhase)
@@ -846,6 +845,7 @@ public class PortletExternalContextImpl extends ExternalContext
    * 
    * @since 1.2
    */
+  @Override
   public String getRequestContentType()
   {
     if (mPhase == Bridge.PortletPhase.RenderPhase)
@@ -882,6 +882,7 @@ public class PortletExternalContextImpl extends ExternalContext
    * 
    * @since 1.2
    */
+  @Override
   public String getResponseCharacterEncoding()
   {
     if (mPhase == Bridge.PortletPhase.ActionPhase)
@@ -917,6 +918,7 @@ public class PortletExternalContextImpl extends ExternalContext
    * 
    * @since 1.2
    */
+  @Override
   public String getResponseContentType()
   {
     if (mPhase == Bridge.PortletPhase.ActionPhase)
@@ -942,6 +944,7 @@ public class PortletExternalContextImpl extends ExternalContext
    * 
    * @since 1.2
    */
+  @Override
   public void setResponse(Object response)
   {
     mPortletResponse = (PortletResponse) response;
@@ -972,6 +975,7 @@ public class PortletExternalContextImpl extends ExternalContext
    * @since 1.2
    * 
    */
+  @Override
   public void setResponseCharacterEncoding(String encoding)
   {
     // JSR 168 has no corresponding API.
@@ -984,7 +988,7 @@ public class PortletExternalContextImpl extends ExternalContext
    */
   private String getViewId() throws BridgeDefaultViewNotSpecifiedException
   {
-    String viewId = (String) mPortletRequest.getParameter(ACTION_ID_PARAMETER_NAME);
+    String viewId = mPortletRequest.getParameter(ACTION_ID_PARAMETER_NAME);
 
     log("PortletExternalContextImpl.getViewId: found action_id = " + viewId);
 
@@ -1014,16 +1018,16 @@ public class PortletExternalContextImpl extends ExternalContext
       // they are needed/called by the client
       queryStr = new QueryString(viewId.substring(queryStart + 1), "UTF8");
 
-      mInternalRequestParameterMap = new HashMap(5);
-      mInternalRequestParameterValuesMap = new HashMap(5);
+      // TODO: Constants
+      mInternalRequestParameterMap = new HashMap<String, String>(5);
+      mInternalRequestParameterValuesMap = new HashMap<String, String[]>(5);
 
-      Enumeration list = queryStr.getParameterNames();
+      Enumeration<String> list = queryStr.getParameterNames();
       while (list.hasMoreElements())
       {
-        String param = (String) list.nextElement().toString();
+        String param = list.nextElement();
         mInternalRequestParameterMap.put(param, queryStr.getParameter(param));
-        mInternalRequestParameterValuesMap
-                                          .put(param, new String[] { queryStr.getParameter(param) });
+        mInternalRequestParameterValuesMap.put(param, new String[]{queryStr.getParameter(param)});
       }
 
       viewId = viewId.substring(0, queryStart);
@@ -1033,7 +1037,7 @@ public class PortletExternalContextImpl extends ExternalContext
     return viewId;
   }
   
-  private void mapPathsFromViewId(String viewId, Vector mappings)
+  private void mapPathsFromViewId(String viewId, List<String> mappings)
   {
     if (viewId == null || mappings == null)
     {
@@ -1046,7 +1050,7 @@ public class PortletExternalContextImpl extends ExternalContext
     
     // The only thing that matters is we use a configured mapping
     // So just use the first one
-    String mapping = (String) mappings.elementAt(0);
+    String mapping = mappings.get(0);
     if (mapping.startsWith("*"))
     {
       // we are using suffix mapping
@@ -1094,7 +1098,7 @@ public class PortletExternalContextImpl extends ExternalContext
 
     if (extLoc != -1 && extLoc > viewId.lastIndexOf('/'))
     {
-      StringBuffer sb = new StringBuffer("*");
+      StringBuilder sb = new StringBuilder("*");
       sb.append(viewId.substring(extLoc));
       return sb.toString();
     }
@@ -1143,7 +1147,7 @@ public class PortletExternalContextImpl extends ExternalContext
     return viewId;
   }
 
-  private boolean isSuffixedMapped(String url, Vector mappings)
+  private boolean isSuffixedMapped(String url, List<String> mappings)
   {
     // see if the viewId terminates with an extension
     // if non-null value contains *.XXX where XXX is the extension
@@ -1151,7 +1155,7 @@ public class PortletExternalContextImpl extends ExternalContext
     return ext != null && mappings.contains(ext);
   }
 
-  private String viewIdFromSuffixMapping(String url, Vector mappings, String ctxDefault)
+  private String viewIdFromSuffixMapping(String url, List<String> mappings, String ctxDefault)
   {
     // replace extension with the DEFAULT_SUFFIX
     if (ctxDefault == null)
@@ -1175,12 +1179,12 @@ public class PortletExternalContextImpl extends ExternalContext
     return url;
   }
 
-  private boolean isPrefixedMapped(String url, Vector mappings)
+  private boolean isPrefixedMapped(String url, List<String> mappings)
   {
     for (int i = 0; i < mappings.size(); i++)
     {
       String prefix = null;
-      String mapping = (String) mappings.elementAt(i);
+      String mapping = mappings.get(i);
       if (mapping.startsWith("/"))
       {
         int j = mapping.lastIndexOf("/*");
@@ -1197,12 +1201,12 @@ public class PortletExternalContextImpl extends ExternalContext
     return false;
   }
 
-  private String viewIdFromPrefixMapping(String url, Vector mappings)
+  private String viewIdFromPrefixMapping(String url, List<String> mappings)
   {
     for (int i = 0; i < mappings.size(); i++)
     {
       String prefix = null;
-      String mapping = (String) mappings.elementAt(i);
+      String mapping = mappings.get(i);
       if (mapping.startsWith("/"))
       {
         int j = mapping.lastIndexOf("/*");
@@ -1216,37 +1220,6 @@ public class PortletExternalContextImpl extends ExternalContext
         return url.substring(prefix.length());
       }
     }
-    return null;
-  }
-
-  private String viewIdWithPrefixMapping(String viewId, Vector mappings)
-  {
-    // use first prefix mapping found
-    for (int i = 0; i < mappings.size(); i++)
-    {
-      String prefix = null;
-      String mapping = (String) mappings.elementAt(i);
-      if (mapping.startsWith("/"))
-      {
-        int j = mapping.lastIndexOf("/*");
-        if (j != -1)
-        {
-          prefix = mapping.substring(0, j);
-        }
-      }
-      if (prefix != null)
-      {
-        if (viewId.startsWith("/"))
-        {
-          return prefix + viewId;
-        }
-        else
-        {
-          return prefix + "/" + viewId;
-        }
-      }
-    }
-
     return null;
   }
 

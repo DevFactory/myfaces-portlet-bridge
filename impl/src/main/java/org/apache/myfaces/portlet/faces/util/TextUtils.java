@@ -79,7 +79,7 @@ public class TextUtils
     }
     int origLen = orig.length();
     int startPos = 0;
-    SimpleStringBuffer result = new SimpleStringBuffer(origLen + 100);
+    StringBuilder result = new StringBuilder(origLen + 100);
 
     // Use 'do' loop, because we know the search string occurs at least once
     do

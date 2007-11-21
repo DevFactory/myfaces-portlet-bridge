@@ -14,7 +14,6 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
 
 package org.apache.myfaces.portlet.faces.util.map;
@@ -28,10 +27,10 @@ import java.util.Map;
 /**
  * Map of portlet request header values
  */
-public class PortletRequestHeaderValuesMap extends PortletAbstractMap
+public class PortletRequestHeaderValuesMap extends PortletAbstractMap<String[]>
 {
   private final PortletRequestHeaders mPortletRequestHeaders;
-  private final Map                   mValueCache = new HashMap();
+  private final Map<String, String[]> mValueCache = new HashMap<String, String[]>();
 
   public PortletRequestHeaderValuesMap(PortletRequestHeaders portletRequestHeaders)
   {
@@ -39,9 +38,9 @@ public class PortletRequestHeaderValuesMap extends PortletAbstractMap
   }
 
   @Override
-  protected Object getAttribute(String key)
+  protected String[] getAttribute(String key)
   {
-    Object ret = mValueCache.get(key);
+    String[] ret = mValueCache.get(key);
     if (ret == null)
     {
       mValueCache.put(key, ret = toArray(mPortletRequestHeaders.getHeaders(key)));
@@ -50,7 +49,7 @@ public class PortletRequestHeaderValuesMap extends PortletAbstractMap
   }
 
   @Override
-  protected void setAttribute(String key, Object value)
+  protected void setAttribute(String key, String[] value)
   {
     throw new UnsupportedOperationException();
   }
@@ -60,22 +59,22 @@ public class PortletRequestHeaderValuesMap extends PortletAbstractMap
   {
     throw new UnsupportedOperationException("");
   }
-
+  
   @Override
-  protected Enumeration getAttributeNames()
+  protected Enumeration<String> getAttributeNames()
   {
     return mPortletRequestHeaders.getHeaderNames();
   }
 
-  private String[] toArray(Enumeration e)
+  private String[] toArray(Enumeration<String> e)
   {
-    List ret = new ArrayList();
+    List<String> ret = new ArrayList<String>();
 
     while (e.hasMoreElements())
     {
       ret.add(e.nextElement());
     }
 
-    return (String[]) ret.toArray(new String[ret.size()]);
+    return ret.toArray(new String[ret.size()]);
   }
 }

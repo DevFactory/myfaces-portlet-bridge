@@ -26,7 +26,7 @@ import javax.portlet.PortletContext;
 /**
  * Map of portlet context init params
  */
-public class PortletInitParameterMap extends PortletAbstractMap
+public class PortletInitParameterMap extends PortletAbstractMap<String>
 {
   private final PortletContext mPortletContext;
 
@@ -43,7 +43,7 @@ public class PortletInitParameterMap extends PortletAbstractMap
   }
 
   @Override
-  public Object getAttribute(String key)
+  public String getAttribute(String key)
   {
     if (mPortletContext != null)
     {
@@ -56,7 +56,7 @@ public class PortletInitParameterMap extends PortletAbstractMap
   }
 
   @Override
-  public void setAttribute(String key, Object value)
+  public void setAttribute(String key, String value)
   {
     throw new UnsupportedOperationException();
   }
@@ -67,8 +67,9 @@ public class PortletInitParameterMap extends PortletAbstractMap
     throw new UnsupportedOperationException();
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  public Enumeration getAttributeNames()
+  public Enumeration<String> getAttributeNames()
   {
     if (mPortletContext != null)
     {

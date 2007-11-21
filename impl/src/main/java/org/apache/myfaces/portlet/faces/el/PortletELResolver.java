@@ -19,9 +19,9 @@
 package org.apache.myfaces.portlet.faces.el;
 
 import java.beans.FeatureDescriptor;
-
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,13 +32,10 @@ import javax.el.ELException;
 import javax.el.ELResolver;
 import javax.el.PropertyNotFoundException;
 import javax.el.PropertyNotWritableException;
-
-import javax.faces.context.FacesContext;
 import javax.faces.context.ExternalContext;
-
+import javax.faces.context.FacesContext;
 import javax.portlet.PortletConfig;
 import javax.portlet.PortletRequest;
-
 import javax.portlet.faces.Bridge;
 import javax.portlet.faces.BridgeUtil;
 
@@ -227,25 +224,32 @@ public class PortletELResolver extends ELResolver
     return fd;
   }
 
-  private Map getPreferencesValueMap(ExternalContext extCtx)
+  @SuppressWarnings("unchecked")
+  private Map<String, String> getPreferencesValueMap(ExternalContext extCtx)
   {
-    PortletRequest portletRequest = (PortletRequest) extCtx.getRequest();
-    Enumeration e = portletRequest.getPreferences().getNames();
-    Map m = null;
+    Map<String, String> m;
 
-    while (e.hasMoreElements())
+    PortletRequest portletRequest = (PortletRequest) extCtx.getRequest();
+    Enumeration<String> e = portletRequest.getPreferences().getNames();
+    
+    if (e.hasMoreElements())
     {
-      if (m == null)
+      m = new HashMap<String, String>();
+      while (e.hasMoreElements())
       {
-        m = new HashMap();
-      }
-      String name = (String) e.nextElement();
-      String value = portletRequest.getPreferences().getValue(name, null);
-      if (value != null)
-      {
-        m.put(name, value);
+        String name = e.nextElement();
+        String value = portletRequest.getPreferences().getValue(name, null);
+        if (value != null)
+        {
+          m.put(name, value);
+        }
       }
     }
+    else
+    {
+      m = Collections.emptyMap();
+    }
+    
     return m;
   }
 

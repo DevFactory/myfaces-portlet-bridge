@@ -14,7 +14,6 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
 
 package org.apache.myfaces.portlet.faces.util.map;
@@ -24,7 +23,7 @@ import java.util.Enumeration;
 /**
  * Map of portlet request headers
  */
-public class PortletRequestHeaderMap extends PortletAbstractMap
+public class PortletRequestHeaderMap extends PortletAbstractMap<String>
 {
   private final PortletRequestHeaders mPortletRequestHeaders;
 
@@ -34,13 +33,13 @@ public class PortletRequestHeaderMap extends PortletAbstractMap
   }
 
   @Override
-  protected Object getAttribute(String key)
+  protected String getAttribute(String key)
   {
     return mPortletRequestHeaders.getHeader(key);
   }
 
   @Override
-  protected void setAttribute(String key, Object value)
+  protected void setAttribute(String key, String value)
   {
     throw new UnsupportedOperationException();
   }
@@ -51,8 +50,9 @@ public class PortletRequestHeaderMap extends PortletAbstractMap
     throw new UnsupportedOperationException();
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  protected Enumeration getAttributeNames()
+  protected Enumeration<String> getAttributeNames()
   {
     return mPortletRequestHeaders.getHeaderNames();
   }

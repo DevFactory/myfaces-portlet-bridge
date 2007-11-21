@@ -21,9 +21,7 @@ package org.apache.myfaces.portlet.faces.bridge;
 
 import java.io.IOException;
 import java.io.Serializable;
-
 import java.rmi.server.UID;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -33,12 +31,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Vector;
 
 import javax.el.ELContext;
 import javax.el.ELContextEvent;
 import javax.el.ELContextListener;
-
 import javax.faces.FacesException;
 import javax.faces.FactoryFinder;
 import javax.faces.application.Application;
@@ -48,7 +44,6 @@ import javax.faces.application.ViewHandler;
 import javax.faces.component.UIViewRoot;
 import javax.faces.context.ExternalContext;
 import javax.faces.context.FacesContext;
-
 import javax.faces.context.FacesContextFactory;
 import javax.faces.event.PhaseEvent;
 import javax.faces.event.PhaseId;
@@ -57,7 +52,6 @@ import javax.faces.lifecycle.Lifecycle;
 import javax.faces.lifecycle.LifecycleFactory;
 import javax.faces.render.ResponseStateManager;
 import javax.faces.webapp.FacesServlet;
-
 import javax.portlet.ActionRequest;
 import javax.portlet.ActionResponse;
 import javax.portlet.PortalContext;
@@ -69,10 +63,8 @@ import javax.portlet.PortletResponse;
 import javax.portlet.PortletSession;
 import javax.portlet.RenderRequest;
 import javax.portlet.RenderResponse;
-
 import javax.portlet.faces.Bridge;
 import javax.portlet.faces.BridgeException;
-
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletRequest;
@@ -82,41 +74,31 @@ import javax.servlet.http.HttpSessionBindingEvent;
 import javax.servlet.http.HttpSessionBindingListener;
 
 import org.apache.myfaces.portlet.faces.bridge.wrapper.BridgeRenderRequestWrapper;
-import org.apache.myfaces.portlet.faces.util.config.WebConfigurationProcessor;
 import org.apache.myfaces.portlet.faces.context.PortletExternalContextImpl;
+import org.apache.myfaces.portlet.faces.util.config.WebConfigurationProcessor;
 
 public class BridgeImpl
   implements Bridge, ELContextListener, PhaseListener
 {
+  // public so PortletStateManager can see/use
+  public static final String UPDATED_VIEW_STATE_PARAM = "org.apache.myfaces.portlet.faces.updatedViewStateParam";
 
-  /**
-   * 
-   */
-  private static final long serialVersionUID = -2181720908326762776L;
-  private static final String REQUEST_SCOPE_LOCK = 
-    "org.apache.myfaces.portlet.faces.requestScopeLock";
-  private static final String REQUEST_SCOPE_MAP = 
-    "org.apache.myfaces.portlet.faces.requestScopeMap";
-  private static final String REQUEST_SCOPE_LISTENER = 
-    "org.apache.myfaces.portlet.faces.requestScopeWatch";
+  private static final String REQUEST_SCOPE_LOCK = "org.apache.myfaces.portlet.faces.requestScopeLock";
+  private static final String REQUEST_SCOPE_MAP = "org.apache.myfaces.portlet.faces.requestScopeMap";
+  private static final String REQUEST_SCOPE_LISTENER = "org.apache.myfaces.portlet.faces.requestScopeWatch";
   private static final String FACES_VIEWROOT = "org.apache.myfaces.portlet.faces.facesViewRoot";
   private static final String FACES_MESSAGES = "org.apache.myfaces.portlet.faces.facesMessages";
-  // public so PortletStateManager can see/use
-  public static final String UPDATED_VIEW_STATE_PARAM =
-    "org.apache.myfaces.portlet.faces.updatedViewStateParam";
-  private static final String REQUEST_PARAMETERS = 
-    "org.apache.myfaces.portlet.faces.requestParameters";
+  private static final String REQUEST_PARAMETERS = "org.apache.myfaces.portlet.faces.requestParameters";
   private static final String REQUEST_SCOPE_ID_RENDER_PARAM = "_bridgeRequestScopeId";
+  private static final int DEFAULT_MAX_MANAGED_REQUEST_SCOPES = 100;
 
-  private PortletConfig mPortletConfig = null;
   private boolean mPreserveActionParams = false;
 
+  private PortletConfig mPortletConfig = null;
   private FacesContextFactory mFacesContextFactory = null;
   private Lifecycle mLifecycle = null;
+  private List<String> mFacesMappings = null;
 
-  private Vector mFacesMappings = null;
-
-  private static final Integer sDefaultMaxManagedRequestScopes = new Integer(100);
 
   public BridgeImpl()
   {
@@ -126,6 +108,8 @@ public class BridgeImpl
   public void init(PortletConfig config)
     throws BridgeException
   {
+  	//TODO: Should we throw an exception if the bridge is already initialized?
+  	
     mPortletConfig = config;
     PortletContext portletContext = mPortletConfig.getPortletContext();
 
@@ -149,6 +133,9 @@ public class BridgeImpl
     // putting it in the PortletContext. Hence the sync object allows us
     // to limit syncronizing the PortletContext to once per portlet (init
     // time);
+    
+    // TODO: What about synching on a static object or using a class lock?
+    //       Perhaps even the LRUMap itself if said map is a singleton?
     synchronized (portletContext)
     {
       Object lock = portletContext.getAttribute(REQUEST_SCOPE_LOCK);
@@ -167,18 +154,17 @@ public class BridgeImpl
 
     // Process and cache the FacesServlet mappings for use by
     // ExternalContext
-    WebConfigurationProcessor facesConfig = new WebConfigurationProcessor(portletContext);
-    mFacesMappings = facesConfig.getFacesMappings();
+    WebConfigurationProcessor webConfig = new WebConfigurationProcessor(portletContext);
+    mFacesMappings = webConfig.getFacesMappings();
     for (int i = 0; i < mFacesMappings.size(); i++)
     {
-      portletContext.log("Mapping: " + (String) mFacesMappings.elementAt(i));
+      portletContext.log("Mapping: " + mFacesMappings.get(i));
     }
   }
 
   public void doFacesRequest(ActionRequest request, ActionResponse response)
     throws BridgeException
   {
-    Map m = null;
     // Set the Portlet lifecycle phase as a request attribute so its
     // available to Faces extensions -- allowing that code to NOT rely on
     // instanceof which can fail if a portlet container uses a single class
@@ -198,7 +184,7 @@ public class BridgeImpl
     // acquiring the FacesContext because its possible (though unlikely)
     // the application has inserted itself in this process and sets up
     // needed request attributes.
-    String[] excludedAttributes = getExcludedAttributes(request);
+    List<String> excludedAttributes = getExcludedAttributes(request);
 
     FacesContext context = null;
     try
@@ -206,8 +192,6 @@ public class BridgeImpl
       // Get the FacesContext instance for this request
       context = 
           getFacesContextFactory().getFacesContext(mPortletConfig, request, response, getLifecycle());
-      logMap("Received ActionParams: ", 
-             context.getExternalContext().getRequestParameterValuesMap());
 
       // Each action starts a new "action lifecycle"
       // The Bridge preserves request scoped data and if so configured
@@ -275,12 +259,9 @@ public class BridgeImpl
     {
       if (context != null)
       {
-        m = context.getExternalContext().getRequestMap();
         context.release();
       }
     }
-
-    logMap("Action completed: ", m);
   }
 
   public void doFacesRequest(RenderRequest request, RenderResponse response)
@@ -309,9 +290,6 @@ public class BridgeImpl
       context = 
           getFacesContextFactory().getFacesContext(mPortletConfig, request, response, lifecycle);
       ExternalContext extCtx = context.getExternalContext();
-
-      logMap("Received RenderParams: ", 
-             context.getExternalContext().getRequestParameterValuesMap());
 
       // Use request from ExternalContext in case its been wrapped by an
       // extension
@@ -496,13 +474,13 @@ public class BridgeImpl
     saveFacesMessageState(context);
 
     // now place the viewRoot in the request scope
-    Map requestMap = context.getExternalContext().getRequestMap();
+    Map<String, Object> requestMap = context.getExternalContext().getRequestMap();
     requestMap.put(FACES_VIEWROOT, context.getViewRoot());
   }
 
   private void restoreFacesView(FacesContext context, String scopeId)
   {
-    Map requestMap = context.getExternalContext().getRequestMap();
+    Map<String, Object> requestMap = context.getExternalContext().getRequestMap();
     UIViewRoot viewRoot = (UIViewRoot) requestMap.get(FACES_VIEWROOT);
     if (viewRoot != null)
     {
@@ -521,14 +499,14 @@ public class BridgeImpl
     // Always preserve the FACES_VIEW_STATE parameter as per spec.
     // If portlet requests it, also preserve the rst of them.
     ExternalContext ec = context.getExternalContext();
-    Map requestMap = ec.getRequestMap();
-    Map requestParameterMap = ec.getRequestParameterValuesMap();
+    Map<String, Object> requestMap = ec.getRequestMap();
+    Map<String, String[]> requestParameterMap = ec.getRequestParameterValuesMap();
     if (!mPreserveActionParams)
     {
       if (requestMap != null && requestParameterMap != null && 
           requestParameterMap.containsKey(ResponseStateManager.VIEW_STATE_PARAM))
       {
-        HashMap m = new HashMap(1);
+        Map<String, String[]> m = new HashMap<String, String[]>(1);
         m.put(ResponseStateManager.VIEW_STATE_PARAM, 
               requestParameterMap.get(ResponseStateManager.VIEW_STATE_PARAM));
         requestMap.put(REQUEST_PARAMETERS, m);
@@ -576,27 +554,33 @@ public class BridgeImpl
       values[0] = updatedViewStateParam;
 
       // now see if this scope is in the Map
-      Map scopeMap = (Map) requestScopeMap.get(scopeId);
+      Map<String, Object> scopeMap = requestScopeMap.get(scopeId);
+      
       Boolean isNew = false;
 
       if (scopeMap == null) 
       {
         // allocate a Map  and put
-        scopeMap = new HashMap(1);
+        scopeMap = new HashMap<String, Object>(1);
         // delay adding to requestScopeMap until populated
         isNew = true;
       }
       
       // Now get the RequestParameters from the scope
-      Map requestParams = (Map) scopeMap.get(REQUEST_PARAMETERS);
+      @SuppressWarnings("unchecked")
+      Map<String, String[]> requestParams = (Map<String, String[]>)scopeMap.get(REQUEST_PARAMETERS);
+      
       if (requestParams == null) 
       {
-        requestParams = (Map) new HashMap(1);
+        requestParams = new HashMap<String, String[]>(1);
         scopeMap.put(REQUEST_PARAMETERS, requestParams);
       }
       // finally update the value in the Map
       requestParams.put(ResponseStateManager.VIEW_STATE_PARAM, values);
       
+      //TODO: We delay putting this on the map in case an exception occurs in the above
+      //      code.  The above code should never generate an exception, however, so this
+      //      could be simplified.
       // if a newly allocated scope -- don't forget to add it in
       if (isNew)
       {
@@ -611,31 +595,27 @@ public class BridgeImpl
   {
     // see if portlet has defined how many requestScopes to manage
     // for this portlet
-    String managedScopesSetting = 
-      portletContext.getInitParameter(Bridge.MAX_MANAGED_REQUEST_SCOPES);
-    Integer managedScopes = null;
+    int managedScopes = DEFAULT_MAX_MANAGED_REQUEST_SCOPES;
     
+    String managedScopesSetting = 
+    	portletContext.getInitParameter(Bridge.MAX_MANAGED_REQUEST_SCOPES);
     if (managedScopesSetting != null)
     {
-        managedScopes = Integer.getInteger(managedScopesSetting);
+      managedScopes = Integer.parseInt(managedScopesSetting);
     }
     
-    if (managedScopes == null || managedScopes.intValue() <= 0)
-    {
-      managedScopes = sDefaultMaxManagedRequestScopes;
-    }
-
-    return new LRUMap(managedScopes.intValue());
+    return new LRUMap(managedScopes);
   }
 
-  private RenderRequest restoreActionParams(FacesContext context)
+  @SuppressWarnings("unchecked")
+	private RenderRequest restoreActionParams(FacesContext context)
   {
     // this is a little trickier then saving because there is no
     // corresponding set. Instead we wrap the request object and set it
     // on the externalContext.
     ExternalContext ec = context.getExternalContext();
     // Note: only available/restored if this scope was restored.
-    Map m = (Map) ec.getRequestMap().get(REQUEST_PARAMETERS);
+    Map<String, String[]> m = (Map<String, String[]>) ec.getRequestMap().get(REQUEST_PARAMETERS);
 
     // ensures current request returned if nothing to restore/wrap
     RenderRequest wrapped = (RenderRequest) ec.getRequest();
@@ -649,24 +629,21 @@ public class BridgeImpl
 
   public void saveFacesMessageState(FacesContext context)
   {
-    Iterator messages;
     // get the messages from Faces Context
-    Iterator clientIds = context.getClientIdsWithMessages();
+    Iterator<String> clientIds = context.getClientIdsWithMessages();
     if (clientIds.hasNext())
     {
       FacesMessageState state = new FacesMessageState();
       while (clientIds.hasNext())
       {
         String clientId = (String) clientIds.next();
-        messages = context.getMessages(clientId);
-        while (messages.hasNext())
+        for(Iterator<FacesMessage> messages = context.getMessages(clientId);messages.hasNext();)
         {
-          state.addMessage(clientId, (FacesMessage) messages.next());
+        	state.addMessage(clientId, messages.next());
         }
       }
-
       // save state in ViewRoot attributes
-      Map requestMap = context.getExternalContext().getRequestMap();
+      Map<String, Object> requestMap = context.getExternalContext().getRequestMap();
       requestMap.put(FACES_MESSAGES, state);
     }
   }
@@ -676,22 +653,18 @@ public class BridgeImpl
     // Only restore for Render request
     if (context.getExternalContext().getRequest() instanceof RenderRequest)
     {
-      Map map = context.getExternalContext().getRequestMap();
+      Map<String, Object> map = context.getExternalContext().getRequestMap();
 
       // restoring FacesMessages
-      FacesMessageState state1 = (FacesMessageState) map.get(FACES_MESSAGES);
+      FacesMessageState state = (FacesMessageState) map.get(FACES_MESSAGES);
 
-      if (state1 != null)
+      if (state != null)
       {
-        Iterator messages;
-        Iterator clientIds = state1.getClientIds();
-        while (clientIds.hasNext())
-        {
-          String clientId = (String) clientIds.next();
-          messages = state1.getMessages(clientId);
-          while (messages.hasNext())
-          {
-            context.addMessage(clientId, (FacesMessage) messages.next());
+      	for(String clientId:state.getClientIds())
+      	{
+      		for(FacesMessage message:state.getMessages(clientId))
+      		{
+      			context.addMessage(clientId, message);
           }
         }
       }
@@ -717,7 +690,7 @@ public class BridgeImpl
   }
 
   private void saveBridgeRequestScopeData(FacesContext context, String scopeId, 
-                                          String[] excludeList)
+                                          List<String> excludeList)
   {
 
     // Store the RequestMap @ the bridge's request scope
@@ -729,7 +702,8 @@ public class BridgeImpl
     watchScope(context, scopeId);
   }
 
-  private void putBridgeRequestScopeData(String scopeId, Object o)
+  @SuppressWarnings("unchecked")
+  private void putBridgeRequestScopeData(String scopeId, Map<String, Object> o)
   {
     PortletContext portletContext = mPortletConfig.getPortletContext();
 
@@ -745,83 +719,35 @@ public class BridgeImpl
         requestScopeMap = createRequestScopeMap(portletContext);
         portletContext.setAttribute(REQUEST_SCOPE_MAP, requestScopeMap);
       }
-
-      logMap("Saving RequestScope @ requestScopeId: " + scopeId, (Map) o);
       requestScopeMap.put(scopeId, o);
     }
   }
 
-  private Map copyRequestMap(Map m, String[] excludeList)
+  private Map<String, Object> copyRequestMap(Map<String, Object> m, List<String> excludeList)
   {
-    HashMap copy = new HashMap(m.size());
+    Map<String, Object> copy = new HashMap<String, Object>(m.size());
+     
+  	for(Map.Entry<String, Object> entry:m.entrySet())
+  	{
+      // TODO -- restore the ACTION PARAMS if there
 
-    Set keySet = m.keySet();
-    if (keySet != null)
-    {
-      Iterator keys = keySet.iterator();
-      while (keys != null && keys.hasNext())
-      {
-        String requestAttrKey = (String) keys.next();
-        Object requestAttrValue = m.get(requestAttrKey);
-        // TODO -- restore the ACTION PARAMS if there
-
-        // Don't copy any of the portlet or Faces objects
-        if (!inExcludeList(excludeList, requestAttrKey) && 
-            !contextObject(requestAttrKey, requestAttrValue))
-        {
-          copy.put(requestAttrKey, requestAttrValue);
-        }
-      }
-    }
+      // Don't copy any of the portlet or Faces objects
+  		String key = entry.getKey();
+  		Object value = entry.getValue();
+  		if(!excludeList.contains(key) &&
+  			 !contextObject(key, value))
+  		{
+  			copy.put(key, value);
+  		}
+  	}
     return copy;
   }
 
-  private boolean inExcludeList(String[] excludeList, String key)
+  
+  @SuppressWarnings("unchecked")
+  private List<String> getExcludedAttributes(PortletRequest request)
   {
-    if (excludeList == null || excludeList.length <= 0)
-    {
-      return false;
-    }
-    for (String element: excludeList)
-    {
-      if (element.equals(key))
-      {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private String[] getExcludedAttributes(PortletRequest request)
-  {
-    String[] names = null;
-
-    // first count them to allocate the array
-    int i = 0, count = 0;
-    Enumeration e = request.getAttributeNames();
-    if (e == null)
-    {
-      return null;
-    }
-
-    while (e.hasMoreElements())
-    {
-      e.nextElement();
-      count += 1;
-    }
-
-    names = new String[count];
-    e = request.getAttributeNames();
-    if (e == null)
-    {
-      return null;
-    }
-
-    while (e.hasMoreElements() && i < count)
-    {
-      names[i++] = (String) e.nextElement();
-    }
-    return names;
+  	return Collections.list((Enumeration<String>)request.getAttributeNames());
   }
 
   private boolean contextObject(String s, Object o)
@@ -838,43 +764,17 @@ public class BridgeImpl
       s.startsWith("javax.portlet.");
   }
 
-  private void logMap(String message, Map m)
-  {
-    PortletContext context = mPortletConfig.getPortletContext();
-
-    context.log(message);
-    Set keySet = m.keySet();
-    if (keySet != null)
-    {
-      Iterator keys = keySet.iterator();
-      while (keys != null && keys.hasNext())
-      {
-        String requestAttrKey = (String) keys.next();
-        Object o = m.get(requestAttrKey);
-        if (o instanceof String)
-          context.log("     Map entry: " + requestAttrKey +"   value:" + (String) o);
-        else if (o instanceof String[])
-          context.log("     Map entry: " + requestAttrKey + "   value:" + ((String[]) o)[0]);
-        else
-          context.log("     Map entry: " + requestAttrKey);
-      }
-    }
-    else
-    {
-      context.log("Map is empty");
-    }
-
-    context.log("logMap completed");
-  }
-
-  private boolean restoreBridgeRequestScopeData(FacesContext context, String scopeId)
+	@SuppressWarnings("unchecked")
+	private boolean restoreBridgeRequestScopeData(FacesContext context, String scopeId)
     throws BridgeException
   {
 
     PortletContext portletContext = mPortletConfig.getPortletContext();
-    Map m = null;
-    Map requestMap = context.getExternalContext().getRequestMap();
-
+    Map<String, Object> m;
+    Map<String, Object> requestMap = context.getExternalContext().getRequestMap();
+    
+    //TODO: Since this is a private method, is it easier to ensure scope id is not null here thus replacing this with
+    //an assert
     if (scopeId == null)
     {
       return false;
@@ -891,35 +791,14 @@ public class BridgeImpl
         return false;
       }
 
-      m = (Map) requestScopeMap.get(scopeId);
+      m = requestScopeMap.get(scopeId);
       if (m == null)
       {
         return false;
       }
-
-      logMap("Restoring scope: " + scopeId, m);
     }
-
-    // Restore it as the RequestMap
-    Set keySet = m.keySet();
-    if (keySet != null)
-    {
-      Iterator keys = keySet.iterator();
-      while (keys != null && keys.hasNext())
-      {
-        String requestAttrKey = (String) keys.next();
-        Object requestAttrValue = m.get(requestAttrKey);
-
-        requestMap.put(requestAttrKey, requestAttrValue);
-      }
-    }
-    else
-    {
-      return false;
-    }
-    // Let's see what actually made it into the Map
-    logMap("Restored RequestMap: ", context.getExternalContext().getRequestMap());
-
+    
+    requestMap.putAll(m);
     return true;
   }
 
@@ -927,9 +806,10 @@ public class BridgeImpl
                                                    String key)
   {
     PortletContext portletContext = mPortletConfig.getPortletContext();
-    Map m = null;
-    Map requestMap = context.getExternalContext().getRequestMap();
+    Map<String, Object> m = null;
 
+    //TODO: Since this is a private method, is it easier to ensure scope id is not null here thus replacing this with
+    //an assert
     if (scopeId == null)
     {
       return false;
@@ -946,7 +826,7 @@ public class BridgeImpl
         return false;
       }
 
-      m = (Map) requestScopeMap.get(scopeId);
+      m = requestScopeMap.get(scopeId);
       if (m != null)
       {
         return m.remove(key) != null;
@@ -1048,34 +928,20 @@ public class BridgeImpl
     {
       // get the managedScopeMap
       LRUMap requestScopeMap = (LRUMap) portletContext.getAttribute(REQUEST_SCOPE_MAP);
-      Vector v = new Vector(10);
 
       if (requestScopeMap != null)
       {
-        Set keySet = requestScopeMap.keySet();
-        if (keySet != null)
-        {
-          Iterator keys = keySet.iterator();
-          while (keys != null && keys.hasNext())
+      	Iterator<String> iterator = requestScopeMap.keySet().iterator();
+      	while(iterator.hasNext())
+      	{
+      		String scopeId = iterator.next();
+          if (scopeId != null && scopeId.startsWith(scopePrefix))
           {
-            String scopeId = (String) keys.next();
-            if (scopeId != null && scopeId.startsWith(scopePrefix))
-            {
-              // can't remove while iterating or else get a concurrency exception
-              v.add(scopeId);
-            }
+          	iterator.remove();
           }
-        }
-
-        for (int i = 0; i < v.size(); i++)
-        {
-          String scopeId = (String) v.elementAt(i);
-          requestScopeMap.remove(scopeId);
-        }
+      	}
       }
     }
-    
-    
   }
 
   /* Implement the PhaseListener methods */
@@ -1101,7 +967,7 @@ public class BridgeImpl
   }
 
   private final class LRUMap
-    extends LinkedHashMap
+    extends LinkedHashMap<String, Map<String, Object>>
   {
 
     /**
@@ -1117,7 +983,7 @@ public class BridgeImpl
     }
 
     @Override
-    protected boolean removeEldestEntry(Map.Entry eldest)
+    protected boolean removeEldestEntry(Map.Entry<String, Map<String,Object>> eldest)
     {
       return size() > mMaxCapacity;
     }
@@ -1140,37 +1006,37 @@ public class BridgeImpl
      */
     private static final long serialVersionUID = 8438070672451887050L;
     // For saving and restoring FacesMessages
-    private Map mMessages = new HashMap(); // key=clientId;
+    private Map<String, List<FacesMessage>> mMessages = new HashMap<String, List<FacesMessage>>(); // key=clientId;
 
     // value=FacesMessages
 
     public void addMessage(String clientId, FacesMessage message)
     {
-      List list = (List) mMessages.get(clientId);
+      List<FacesMessage> list = mMessages.get(clientId);
       if (list == null)
       {
-        list = new ArrayList();
+        list = new ArrayList<FacesMessage>();
         mMessages.put(clientId, list);
       }
       list.add(message);
     }
 
-    public Iterator getMessages(String clientId)
+    public List<FacesMessage> getMessages(String clientId)
     {
-      List list = (List) mMessages.get(clientId);
+      List<FacesMessage> list = mMessages.get(clientId);
       if (list != null)
       {
-        return list.iterator();
+        return list;
       }
       else
       {
-        return Collections.EMPTY_LIST.iterator();
+        return Collections.emptyList();
       }
     }
 
-    public Iterator getClientIds()
+    public Set<String> getClientIds()
     {
-      return mMessages.keySet().iterator();
+      return mMessages.keySet();
     }
   }
 

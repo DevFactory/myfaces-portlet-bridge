@@ -14,55 +14,59 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
 
 package org.apache.myfaces.portlet.faces.util.map;
 
-import javax.portlet.PortletRequest;
-
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
-import java.util.Collections;
-import java.util.Iterator;
 import java.util.Locale;
+import java.util.Map;
 
 import javax.portlet.ActionRequest;
+import javax.portlet.PortletRequest;
 import javax.portlet.faces.Bridge;
 
 public class PortletRequestHeaders
 {
   private PortletRequest mPortletRequest = null;
-  private List           mHeaderNames    = null;
-  private Map            mHeaders        = null;
+  private List<String> mHeaderNames = null;
+  private Map<String, List<String>> mHeaders = null;
 
   public PortletRequestHeaders(PortletRequest request)
   {
     mPortletRequest = request;
   }
 
-  public java.lang.String getHeader(java.lang.String name)
+  @SuppressWarnings("unchecked")
+  public String getHeader(String name)
   {
     // initialize the header map if it hasn't been already
     initHeaderMap();
 
-    List headerVals = (List) mHeaders.get(name.toUpperCase());
+    List<String> headerVals = mHeaders.get(name.toUpperCase());
     return headerVals == null ? null : (String) headerVals.get(0);
   }
 
-  public java.util.Enumeration getHeaders(java.lang.String name)
+  public Enumeration<String> getHeaders(String name)
   {
     // initialize the header map if it hasn't been already
     initHeaderMap();
 
-    List headerVals = (List) mHeaders.get(name.toUpperCase());
-    return Collections.enumeration(headerVals == null ? Collections.EMPTY_LIST : headerVals);
+    List<String> headerVals = mHeaders.get(name.toUpperCase());
+    
+    if (headerVals == null)
+    {
+      headerVals = Collections.emptyList();
+    }
+    
+    return Collections.enumeration(headerVals);
   }
 
-  public java.util.Enumeration getHeaderNames()
+  public Enumeration<String> getHeaderNames()
   {
     // initialize the header map if it hasn't been already
     initHeaderMap();
@@ -73,6 +77,7 @@ public class PortletRequestHeaders
   /**
    * Does 'lazy' initialization of Map of 'properties', i.e. mime headers.
    */
+  @SuppressWarnings("unchecked")
   protected boolean initHeaderMap()
   {
     if (mHeaders != null)
@@ -80,41 +85,34 @@ public class PortletRequestHeaders
       return false;
     }
 
-    mHeaders = Collections.EMPTY_MAP;
-    mHeaderNames = Collections.EMPTY_LIST;
+    mHeaders = Collections.emptyMap();
+    mHeaderNames = Collections.emptyList();
 
-    Enumeration props = mPortletRequest.getPropertyNames();
-    Enumeration values = null;
-    StringBuffer property = null;
-
-    while (props != null && props.hasMoreElements())
+    Enumeration<String> props = mPortletRequest.getPropertyNames();
+    while (props.hasMoreElements())
     {
-      String name = (String) props.nextElement();
-      values = mPortletRequest.getProperties(name);
+      String name = props.nextElement();
+      Enumeration<String> values = mPortletRequest.getProperties(name);
       while (values != null && values.hasMoreElements())
       {
-        addProperty(name, (String) values.nextElement());
+        addProperty(name, values.nextElement());
       }
     }
+    
+    StringBuilder property = null;
 
     // if they don't already exist, now add in the the required (HTTP)
     // headers to ensure compatibility with servlets
     if (!containsHeader(mHeaderNames, "ACCEPT"))
     {
-      values = mPortletRequest.getResponseContentTypes();
-      if (property == null)
-      {
-        property = new StringBuffer(64);
-      }
-      else
-      {
-        property.setLength(0);
-      }
+      Enumeration<String> contentTypes = mPortletRequest.getResponseContentTypes();
+      property = new StringBuilder(64);
+      
       boolean addComma = false;
-      while (values != null && values.hasMoreElements())
+      while (contentTypes.hasMoreElements())
       {
-        String s = (String) values.nextElement();
-        if (s != null)
+        String type = contentTypes.nextElement();
+        if (type != null)
         {
           if (addComma)
           {
@@ -124,7 +122,8 @@ public class PortletRequestHeaders
           {
             addComma = true;
           }
-          property = property.append(s);
+          
+          property = property.append(type);
         }
       }
 
@@ -136,19 +135,20 @@ public class PortletRequestHeaders
 
     if (!containsHeader(mHeaderNames, "ACCEPT-LANGUAGE"))
     {
-      values = mPortletRequest.getLocales();
+      Enumeration<Locale> locales = mPortletRequest.getLocales();
       if (property == null)
       {
-        property = new StringBuffer(64);
+        property = new StringBuilder(64);
       }
       else
       {
         property.setLength(0);
       }
+      
       boolean addComma = false;
-      while (values != null && values.hasMoreElements())
+      while (locales.hasMoreElements())
       {
-        Locale l = (Locale) values.nextElement();
+        Locale l = locales.nextElement();
         if (l != null)
         {
           if (addComma)
@@ -159,6 +159,7 @@ public class PortletRequestHeaders
           {
             addComma = true;
           }
+          
           String s = l.getLanguage();
           // only add if language not empty
           if (s.length() > 0)
@@ -192,7 +193,7 @@ public class PortletRequestHeaders
         {
           if (property == null)
           {
-            property = new StringBuffer(64);
+            property = new StringBuilder(64);
           }
           else
           {
@@ -224,17 +225,16 @@ public class PortletRequestHeaders
     return true;
   }
 
-  private boolean containsHeader(List headerNames, String key)
+  private boolean containsHeader(List<String> headerNames, String key)
   {
-    Iterator i = headerNames.iterator();
-    while (i.hasNext())
+    for (String name : headerNames)
     {
-      String name = (String) i.next();
       if (key.toUpperCase().equals(name.toUpperCase()))
       {
         return true;
       }
     }
+    
     return false;
   }
 
@@ -242,15 +242,15 @@ public class PortletRequestHeaders
   {
     if (mHeaders == Collections.EMPTY_MAP)
     {
-      mHeaders = new HashMap(40);
-      mHeaderNames = new ArrayList(30);
+      mHeaders = new HashMap<String, List<String>>(40);
+      mHeaderNames = new ArrayList<String>(30);
     }
     // Store against UPPER CASE key to make case-insensitive
     String upperName = name.toUpperCase();
-    List propertyList = (List) mHeaders.get(upperName);
+    List<String> propertyList = mHeaders.get(upperName);
     if (propertyList == null)
     {
-      propertyList = new ArrayList(4);
+      propertyList = new ArrayList<String>(4);
       mHeaders.put(upperName, propertyList);
       mHeaderNames.add(name);
     }

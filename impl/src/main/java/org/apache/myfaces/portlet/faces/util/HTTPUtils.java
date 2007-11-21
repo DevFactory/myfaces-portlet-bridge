@@ -21,10 +21,8 @@ package org.apache.myfaces.portlet.faces.util;
 
 import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
-
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-
 import java.util.Locale;
 import java.util.TimeZone;
 
@@ -173,7 +171,7 @@ public class HTTPUtils
                                          + " host: " + host + " port: " + port + " path: " + path);
     }
 
-    SimpleStringBuffer url = new SimpleStringBuffer(200);
+    StringBuilder url = new StringBuilder(200);
 
     url.append(scheme).append("://").append(host);
 
@@ -209,7 +207,7 @@ public class HTTPUtils
     // Create a buffer that is roughly 1.5 times bigger than the value to
     // account for possible expansion of the resulting encoded string
     int len = value.length();
-    SimpleStringBuffer out = new SimpleStringBuffer(len * 3 / 2);
+    StringBuilder out = new StringBuilder(len * 3 / 2);
 
     for (int charIndex = 0; charIndex < len; charIndex++)
     {
@@ -538,7 +536,7 @@ public class HTTPUtils
     String variant = locale.getVariant();
     if (country.length() > 0 || variant.length() > 0)
     {
-      SimpleStringBuffer buff = new SimpleStringBuffer(20).append(language).append('-')
+      StringBuilder buff = new StringBuilder(20).append(language).append('-')
                                                           .append(country);
       if (variant.length() > 0)
       {
@@ -698,7 +696,7 @@ public class HTTPUtils
     int i = 0;
     int bytesToWrite = bytes.length;
 
-    SimpleStringBuffer buff = new SimpleStringBuffer(bytes.length * 4 / 3);
+    StringBuilder buff = new StringBuilder(bytes.length * 4 / 3);
 
     while (bytesToWrite >= 3)
     {

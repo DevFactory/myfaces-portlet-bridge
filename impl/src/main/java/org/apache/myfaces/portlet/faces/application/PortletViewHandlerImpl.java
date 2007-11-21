@@ -22,10 +22,6 @@ package org.apache.myfaces.portlet.faces.application;
 import java.io.IOException;
 import java.io.Writer;
 
-import java.util.Locale;
-
-import java.util.Map;
-
 import javax.faces.FacesException;
 import javax.faces.FactoryFinder;
 import javax.faces.application.StateManager;
@@ -37,17 +33,12 @@ import javax.faces.context.FacesContext;
 import javax.faces.context.ResponseWriter;
 import javax.faces.render.RenderKit;
 import javax.faces.render.RenderKitFactory;
-
 import javax.portlet.RenderResponse;
-
 import javax.portlet.faces.Bridge;
 import javax.portlet.faces.BridgeUtil;
 import javax.portlet.faces.component.PortletNamingContainerUIViewRoot;
 
-import javax.servlet.ServletContext;
-
 import org.apache.myfaces.portlet.faces.context.PortletExternalContextImpl;
-import org.apache.myfaces.portlet.faces.util.URLUtils;
 
 /**
  * View handler implementation for JSF portlet bridge.
