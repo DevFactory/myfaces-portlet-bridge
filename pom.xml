@@ -153,17 +153,6 @@
         <enabled>false</enabled>
       </snapshots>
     </repository>
-    
-    <repository>
-      <id>myfaces-staging</id>
-      <url>http://people.apache.org/builds/myfaces/m2-staging-repository</url>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
   </repositories>
 
   <!-- Versions and scope of dependencies -->
