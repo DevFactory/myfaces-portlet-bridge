@@ -49,7 +49,7 @@ public class BridgeUtil
   
   public static boolean isPortletRenderRequest() 
   {
-    Map m = FacesContext.getCurrentInstance().getExternalContext().getRequestMap();
+    Map<String, Object> m = FacesContext.getCurrentInstance().getExternalContext().getRequestMap();
     Bridge.PortletPhase phase = (Bridge.PortletPhase) m.get(Bridge.PORTLET_LIFECYCLE_PHASE);
     if (phase != null && phase == Bridge.PortletPhase.RenderPhase)
     {
