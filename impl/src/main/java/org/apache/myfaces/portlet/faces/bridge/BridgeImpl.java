@@ -758,15 +758,30 @@ public class BridgeImpl
       o instanceof PortletPreferences || o instanceof PortalContext || o instanceof FacesContext || 
       o instanceof ExternalContext || o instanceof ServletConfig || o instanceof ServletContext || 
       o instanceof ServletRequest || o instanceof ServletResponse || o instanceof HttpSession || 
-      s.startsWith("javax.servlet.include") ||
-      s.startsWith("javax.portlet.faces.") ||
-      s.startsWith("org.apache.myfaces.trinidad") ||
-      s.startsWith("com.sun.faces.") ||
-      s.startsWith("javax.portlet.");
+      isInNamespace(s, "javax.portlet.") ||
+      isInNamespace(s, "javax.portlet.faces.") ||
+      isInNamespace(s, "javax.faces.") ||
+      isInNamespace(s, "javax.servlet.") ||
+      isInNamespace(s, "javax.servlet.include.") ||
+      // TODO: remove once support configuring these
+      s.startsWith("org.apache.myfaces.trinidad.") ||
+      s.startsWith("com.sun.faces.");
+    }
+      
+  private boolean isInNamespace(String s, String namespace)
+  {
+    // This is a non-recursive check so s must be the result of removing the namespace.
+    if (s.startsWith(namespace))
+    {
+    // extract entire namespace and compare
+    s = s.substring(0, s.lastIndexOf('.') + 1);
+    return s.equals(namespace);
+    }
+    return false;
   }
 
-	@SuppressWarnings("unchecked")
-	private boolean restoreBridgeRequestScopeData(FacesContext context, String scopeId)
+  @SuppressWarnings("unchecked")
+  private boolean restoreBridgeRequestScopeData(FacesContext context, String scopeId)
     throws BridgeException
   {
 

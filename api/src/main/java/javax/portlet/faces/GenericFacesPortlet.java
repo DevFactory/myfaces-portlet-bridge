@@ -153,7 +153,11 @@ public class GenericFacesPortlet extends GenericPortlet
     }
     else
     {
-      doDispatchInternal(request, response, request.getPortletMode());
+      // Bridge didn't process this one -- so forge ahead
+      if (!doDispatchInternal(request, response))
+      {
+        super.doDispatch(request, response);
+      }
     }
   }
 
@@ -161,7 +165,7 @@ public class GenericFacesPortlet extends GenericPortlet
   protected void doEdit(RenderRequest request, RenderResponse response) throws PortletException,
                                                                        java.io.IOException
   {
-    doDispatchInternal(request, response, request.getPortletMode());
+    doDispatchInternal(request, response);
 
   }
 
@@ -169,7 +173,7 @@ public class GenericFacesPortlet extends GenericPortlet
   protected void doHelp(RenderRequest request, RenderResponse response) throws PortletException,
                                                                        java.io.IOException
   {
-    doDispatchInternal(request, response, request.getPortletMode());
+    doDispatchInternal(request, response);
 
   }
 
@@ -177,7 +181,7 @@ public class GenericFacesPortlet extends GenericPortlet
   protected void doView(RenderRequest request, RenderResponse response) throws PortletException,
                                                                        java.io.IOException
   {
-    doDispatchInternal(request, response, request.getPortletMode());
+    doDispatchInternal(request, response);
 
   }
 
@@ -226,24 +230,23 @@ public class GenericFacesPortlet extends GenericPortlet
     return getPortletConfig().getInitParameter(Bridge.DEFAULT_VIEWID + "." + mode.toString());
   }
 
-  private void doDispatchInternal(RenderRequest request, RenderResponse response, PortletMode mode)
-                                                                                                   throws PortletException,
-                                                                                                   IOException
+  private boolean doDispatchInternal(RenderRequest request, RenderResponse response)
+     throws PortletException, IOException
   {
-    // Only process if there is a default page defined for this mode
-    String modeDefaultViewId = getDefaultViewId(request, mode);
-
-    if (!(modeDefaultViewId == null))
+    String modeDefaultViewId = getDefaultViewId(request, request.getPortletMode());
+    
+    if (modeDefaultViewId != null)
     {
       WindowState state = request.getWindowState();
       if (!state.equals(WindowState.MINIMIZED))
       {
         doBridgeDispatch(request, response, modeDefaultViewId);
       }
+      return true;
     }
     else
     {
-      super.doDispatch(request, response);
+      return false;
     }
   }
 

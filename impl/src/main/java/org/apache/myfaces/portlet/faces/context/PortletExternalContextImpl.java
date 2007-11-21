@@ -775,13 +775,22 @@ public class PortletExternalContextImpl extends ExternalContext
   public void setRequestCharacterEncoding(String encoding) throws UnsupportedEncodingException,
                                                           IllegalStateException
   {
-    if (mPhase != Bridge.PortletPhase.ActionPhase)
+    /* TODO: Temporary workaround for JIRA PORTLETBRIDGE-14 until EG
+     * decides on best course of action.
+     * 
+   if (mPhase != Bridge.PortletPhase.ActionPhase)
     {
-      throw new IllegalStateException(
-                                      "PortletExternalContextImpl.setRequestCharacterEncoding(): Request must be an ActionRequest");
+          
+        throw new IllegalStateException(
+                                        "PortletExternalContextImpl.setRequestCharacterEncoding(): Request must be an ActionRequest");
     }
-
-    ((ActionRequest) mPortletRequest).setCharacterEncoding(encoding);
+    */
+    
+  	//Part of temp workaround.  Do a noop if we are not in action phase
+    if(mPhase == Bridge.PortletPhase.ActionPhase)
+    {
+      ((ActionRequest) mPortletRequest).setCharacterEncoding(encoding);
+    }
   }
 
   /**

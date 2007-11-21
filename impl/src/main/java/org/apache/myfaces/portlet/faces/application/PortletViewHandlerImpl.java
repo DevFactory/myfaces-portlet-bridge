@@ -19,9 +19,12 @@
 
 package org.apache.myfaces.portlet.faces.application;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.Writer;
-
+import java.util.Locale;
+import java.util.Map;
 import javax.faces.FacesException;
 import javax.faces.FactoryFinder;
 import javax.faces.application.StateManager;
@@ -37,7 +40,6 @@ import javax.portlet.RenderResponse;
 import javax.portlet.faces.Bridge;
 import javax.portlet.faces.BridgeUtil;
 import javax.portlet.faces.component.PortletNamingContainerUIViewRoot;
-
 import org.apache.myfaces.portlet.faces.context.PortletExternalContextImpl;
 
 /**
@@ -71,9 +73,14 @@ public class PortletViewHandlerImpl extends ViewHandlerWrapper
   @Override
   public UIViewRoot createView(FacesContext facesContext, String viewId)
   {
+    // Do nothing when not running in portlet request
+    if (!BridgeUtil.isPortletRequest())
+    {
+      return super.createView(facesContext, viewId);
+    }
 
-    UIViewRoot viewRoot = mDelegate.createView(facesContext, viewId);
- 
+    UIViewRoot viewRoot = super.createView(facesContext, viewId);
+
     if (viewRoot.getClass() != UIViewRoot.class)
     {
       return viewRoot;
@@ -91,6 +98,13 @@ public class PortletViewHandlerImpl extends ViewHandlerWrapper
   public void renderView(FacesContext context, UIViewRoot viewToRender) throws IOException,
                                                                        FacesException
   {
+    // Do nothing when not running in portlet request
+    if (!BridgeUtil.isPortletRequest())
+    {
+      super.renderView(context, viewToRender);
+      return;
+    }
+
     // Get the renderPolicy from the requestScope
     Bridge.BridgeRenderPolicy renderPolicy = (Bridge.BridgeRenderPolicy) context
                                                                                 .getExternalContext()
@@ -103,17 +117,16 @@ public class PortletViewHandlerImpl extends ViewHandlerWrapper
       renderPolicy = Bridge.BridgeRenderPolicy.valueOf("DEFAULT");
     }
 
-    if (!BridgeUtil.isPortletRequest()
-        || renderPolicy == Bridge.BridgeRenderPolicy.ALWAYS_DELEGATE)
+    if (renderPolicy == Bridge.BridgeRenderPolicy.ALWAYS_DELEGATE)
     {
-      mDelegate.renderView(context, viewToRender);
+      super.renderView(context, viewToRender);
       return;
     }
     else if (renderPolicy == Bridge.BridgeRenderPolicy.DEFAULT)
     {
       try
       {
-        mDelegate.renderView(context, viewToRender);
+        super.renderView(context, viewToRender);
         return;
       }
       catch (Throwable t)
@@ -188,17 +201,31 @@ public class PortletViewHandlerImpl extends ViewHandlerWrapper
     // replace markers in the body content and write it to response.
 
     ResponseWriter responseWriter;
+
+    // Dispatch may have output to an OutputStream instead of a Writer
+    Writer renderResponseWriter = null;
+    try {
+      renderResponseWriter = renderResponse.getWriter();
+    } 
+    catch (IllegalStateException ise) {     
+      // got this exception because we've called getOutputStream() previously
+      renderResponseWriter = new BufferedWriter(
+                          new OutputStreamWriter(
+                               renderResponse.getPortletOutputStream(),
+                               renderResponse.getCharacterEncoding()));
+    }
     if (null != oldWriter)
     {
-      responseWriter = oldWriter.cloneWithWriter(renderResponse.getWriter());
+      responseWriter = oldWriter.cloneWithWriter(renderResponseWriter);
     }
     else
     {
-      responseWriter = newWriter.cloneWithWriter(renderResponse.getWriter());
+      responseWriter = newWriter.cloneWithWriter(renderResponseWriter);
     }
     context.setResponseWriter(responseWriter);
 
     strWriter.write(responseWriter);
+    renderResponseWriter.flush();
 
     if (null != oldWriter)
     {

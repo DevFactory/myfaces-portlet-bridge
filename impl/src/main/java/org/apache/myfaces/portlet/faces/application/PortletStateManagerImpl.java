@@ -31,6 +31,8 @@ import javax.faces.context.ResponseWriter;
 
 import javax.faces.render.ResponseStateManager;
 
+import javax.portlet.faces.BridgeUtil;
+
 import org.apache.myfaces.portlet.faces.bridge.BridgeImpl;
 
 public class PortletStateManagerImpl
@@ -69,13 +71,20 @@ public class PortletStateManagerImpl
   public void writeState(FacesContext context, Object state)
     throws IOException
   {
+    // Do nothing when not running in portlet request
+    if (!BridgeUtil.isPortletRequest())
+    {
+      super.writeState(context, state);
+      return;
+    }
+
     // Replace current response writer so can grab what is written
     ResponseWriter oldRW = context.getResponseWriter();
     StringWriter stringWriter = new StringWriter(128);
     ResponseWriter newRW = oldRW.cloneWithWriter(stringWriter);
     context.setResponseWriter(newRW);
     
-    mDelegatee.writeState(context, state);
+    super.writeState(context, state);
     
     // Restore real responsewriter
     context.setResponseWriter(oldRW);

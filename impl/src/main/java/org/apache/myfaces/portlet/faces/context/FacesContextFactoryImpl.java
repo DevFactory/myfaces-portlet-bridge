@@ -26,6 +26,9 @@ import javax.faces.lifecycle.Lifecycle;
 import javax.portlet.PortletConfig;
 import javax.portlet.PortletRequest;
 import javax.portlet.PortletResponse;
+import javax.portlet.faces.Bridge;
+import javax.portlet.faces.BridgeUtil;
+import javax.servlet.ServletRequest;
 
 /**
  * A factory object that creates (if needed) and returns new FacesContext instance for running in
@@ -46,16 +49,26 @@ public class FacesContextFactoryImpl extends FacesContextFactory
   public FacesContext getFacesContext(Object config, Object request, Object response,
                                       Lifecycle lifecycle) throws FacesException
   {
-    // if in portlet environment
-    if (config instanceof PortletConfig && request instanceof PortletRequest
-        && response instanceof PortletResponse)
+    // if in portlet environment -- do a portlet container neutral test
+    // first in case we are packaged in a web app that isn't deployed 
+    // on a portlet container/as a portlet. Note:  can't use the BridgeUtil
+    // method as that call requires the facesContext to exist.
+    if (isPortletRequest(request))
     {
-
-      return new PortletFacesContextImpl(
+      // make sure they passed the right objects
+      if (config instanceof PortletConfig && request instanceof PortletRequest
+        && response instanceof PortletResponse)
+      {
+        return new PortletFacesContextImpl(
                                          new PortletExternalContextImpl((PortletConfig) config,
                                                                         (PortletRequest) request,
                                                                         (PortletResponse) response),
                                          lifecycle);
+      }
+      else
+      {
+        throw new FacesException("getFacesContext failed: Running in a portlet request butnot passed portlet objects");
+      }
     }
     else
     {
@@ -63,4 +76,26 @@ public class FacesContextFactoryImpl extends FacesContextFactory
       return mHandler.getFacesContext(config, request, response, lifecycle);
     }
   }
+  
+  
+  private boolean isPortletRequest(Object request) 
+  {
+    // could be either a servlet or portlet request object (or both)
+    // Check servlet side first in case we are packaged in an application
+    // that is running as a servlet in an environment that doesn't contain
+    // a portlet container.
+    if (request instanceof ServletRequest)
+    {
+      ServletRequest sr = (ServletRequest) request;
+      Bridge.PortletPhase phase = (Bridge.PortletPhase) sr.getAttribute(Bridge.PORTLET_LIFECYCLE_PHASE);
+      return (phase != null);
+    }
+    else if (request instanceof PortletRequest)
+    {
+      return true;
+    }
+      
+    return false;
+  }
+  
 }
