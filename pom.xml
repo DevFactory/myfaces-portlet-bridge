@@ -22,58 +22,32 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>myfaces-master</artifactId>
-    <groupId>org.apache.myfaces.maven</groupId>
-    <version>1.0.5</version>
+    <artifactId>myfaces</artifactId>
+    <groupId>org.apache.myfaces</groupId>
+    <version>3</version>
   </parent>
 
   <groupId>org.apache.myfaces.portlet-bridge</groupId>
   <artifactId>portlet-bridge</artifactId>
   <packaging>pom</packaging>
   <name>Portlet Bridge for JavaServer Faces</name>
-  <url>http://myfaces.apache.org/portlet-bridge</url>
-  <inceptionYear>2007</inceptionYear>
   <version>1.0.0-SNAPSHOT</version>	 
-  
+  <inceptionYear>2007</inceptionYear>  
   <description>
   Portlet Bridge for JavaServer Faces is a subproject of Apache MyFaces which provides an
   implementation of the standardized Portlet Bridge as outlined by JSR-301 and subsequent
   specifications.  This project will work with MyFaces as well as the R.I. and intended to
   be used to develop the Portlet Bridge Reference Implementation.
   </description>
+  <url>http://myfaces.apache.org/portlet-bridge</url>
 
-  <scm>
-    <connection>scm:svn:http://svn.apache.org/repos/asf/myfaces/portlet-bridge/trunk</connection>
-    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/myfaces/portlet-bridge/trunk</developerConnection>
-    <url>http://svn.apache.org/viewcvs.cgi/myfaces/portlet-bridge/trunk</url>
-  </scm>
   <issueManagement>
     <system>jira</system>
     <url>http://issues.apache.org/jira/browse/PORTLETBRIDGE</url>
   </issueManagement>
 
-  <distributionManagement>
-    <repository>
-      <id>apache-maven</id>
-      <name>Apache Maven Repository</name>
-      <url>scpexe://minotaur.apache.org/www/people.apache.org/repo/m2-ibiblio-rsync-repository</url>
-    </repository>
-    <snapshotRepository>
-      <uniqueVersion>false</uniqueVersion>
-      <id>apache-maven-snapshots</id>
-      <name>Apache Maven Snapshot Repository</name>
-      <url>scpexe://minotaur.apache.org/www/people.apache.org/repo/m2-snapshot-repository</url>
-    </snapshotRepository>
-    <site>
-      <id>apache-site</id>
-      <url>scpexe://minotaur.apache.org/www/myfaces.apache.org/portlet-bridge/</url>
-    </site>
-  </distributionManagement>
-
-  <modules>
-    <module>api</module>
-    <module>impl</module>
-  </modules>
+  <!-- ciManagement are in parent -->
+  <!-- mailingLists are in parent -->
 
   <developers>
     <developer>
@@ -95,7 +69,6 @@
       <email>martin.marinschek@gmail.com</email>
       <roles>
         <role>Expert Group Member</role>
-        <role>Committer</role>
       </roles>
       <timezone>+1</timezone>
     </developer>
@@ -107,11 +80,49 @@
       <organizationUrl>http://jboss.org/jbossBlog/blog/Stan%20Silvert/</organizationUrl>
       <roles>
         <role>Expert Group Member</role>
-        <role>Committer</role>
       </roles>
       <timezone />
     </developer>
+    <developer>
+      <id>slessard</id>
+      <name>Simon Lessard</name>
+      <email>slessard@apache.org</email>
+      <organization>Fujitsu Consulting</organization>
+      <organizationUrl>http://www.dmrconseil.ca/</organizationUrl>
+      <timezone>-5</timezone>
+    </developer>
   </developers>
+
+  <contributors>
+    <contributor>
+      <name>Michael Freedman</name>
+      <organization>Oracle Corporation, U.S.A.</organization>
+      <organizationUrl>http://www.oracle.com/</organizationUrl>
+      <email>michael.freedman@oracle.com</email>
+      <roles>
+        <role>JSR-301 Spec Lead</role>
+      </roles>
+      <timezone>-8</timezone>
+    </contributor>
+  </contributors>
+
+  <scm>
+    <connection>scm:svn:http://svn.apache.org/repos/asf/myfaces/portlet-bridge/trunk</connection>
+    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/myfaces/portlet-bridge/trunk</developerConnection>
+    <url>http://svn.apache.org/viewcvs.cgi/myfaces/portlet-bridge/trunk</url>
+  </scm>
+
+  <distributionManagement>
+    <site>
+      <id>apache-site</id>
+      <url>scpexe://minotaur.apache.org/www/myfaces.apache.org/portlet-bridge/</url>
+    </site>
+  </distributionManagement>
+
+  <modules>
+    <module>api</module>
+    <module>impl</module>
+  </modules>
 
   <repositories>
     <repository>
@@ -140,6 +151,17 @@
       </releases>
       <snapshots>
         <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    
+    <repository>
+      <id>myfaces-staging</id>
+      <url>http://people.apache.org/builds/myfaces/m2-staging-repository</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
       </snapshots>
     </repository>
   </repositories>
@@ -317,6 +339,18 @@
   <build>
     <pluginManagement>
       <plugins>
+        <!-- Compiler (http://maven.apache.org/plugins/maven-compiler-plugin/index.html)-->
+        <!-- Overrides MyFaces Master settings -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <configuration>
+            <source>1.5</source>
+            <target>1.5</target>
+          </configuration>
+        </plugin>
+        
+        <!-- Checkstyle tools (http://maven.apache.org/plugins/maven-checkstyle-plugin/index.html) -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-checkstyle-plugin</artifactId>
@@ -328,7 +362,6 @@
             <targetJdk>1.5</targetJdk>
           </configuration>
         </plugin>
-
 
         <!-- Site generation tools (http://maven.apache.org/plugins/maven-site-plugin/index.html)-->
         <plugin>
@@ -351,16 +384,6 @@
           </executions>
         </plugin>
 
-        <!-- Compiler (http://maven.apache.org/plugins/maven-compiler-plugin/index.html)-->
-        <!-- TODO: will this override the settings in MyFaces master -->
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-compiler-plugin</artifactId>
-          <configuration>
-            <source>1.5</source>
-            <target>1.5</target>
-          </configuration>
-        </plugin>
         
         <!-- Code analysis tool (http://maven.apache.org/plugins/maven-pmd-plugin/index.html) -->
         <plugin>

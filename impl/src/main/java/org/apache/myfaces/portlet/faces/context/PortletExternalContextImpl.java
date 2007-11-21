@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.Vector;
 
 import javax.faces.FacesException;
 import javax.faces.application.ViewHandler;
@@ -147,7 +146,7 @@ public class PortletExternalContextImpl extends ExternalContext
     
     // Now reverse engineer the servlet paths from the mappings 
     // So Faces thinks was a client request
-    mFacesMappings = (Vector<String>) mPortletRequest.getAttribute(FACES_MAPPING_ATTRIBUTE);
+    mFacesMappings = (List<String>) mPortletRequest.getAttribute(FACES_MAPPING_ATTRIBUTE);
     mapPathsFromViewId(mViewId, mFacesMappings);
 
 

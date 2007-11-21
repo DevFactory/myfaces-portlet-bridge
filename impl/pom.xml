@@ -62,7 +62,7 @@
       <plugin>
         <groupId>org.apache.myfaces.trinidadbuild</groupId>
         <artifactId>maven-jdev-plugin</artifactId>
-        <version>1.0.1</version>
+        <version>1.2.3</version>
       </plugin>
 
       <!-- Build and sign jars (http://maven.apache.org/plugins/maven-jar-plugin/)-->
