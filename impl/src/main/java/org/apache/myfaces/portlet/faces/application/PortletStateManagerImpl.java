@@ -93,7 +93,7 @@ public class PortletStateManagerImpl
     
     if (stateValue != null) 
     {
-      Map m = context.getExternalContext().getRequestMap();
+      Map<String, Object> m = context.getExternalContext().getRequestMap();
       m.put(BridgeImpl.UPDATED_VIEW_STATE_PARAM, stateValue);
     }
     

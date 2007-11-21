@@ -80,7 +80,9 @@ import org.apache.myfaces.portlet.faces.util.config.WebConfigurationProcessor;
 public class BridgeImpl
   implements Bridge, ELContextListener, PhaseListener
 {
-  // public so PortletStateManager can see/use
+	private static final long	serialVersionUID	= 5807626987246270989L;
+
+	// public so PortletStateManager can see/use
   public static final String UPDATED_VIEW_STATE_PARAM = "org.apache.myfaces.portlet.faces.updatedViewStateParam";
 
   private static final String REQUEST_SCOPE_LOCK = "org.apache.myfaces.portlet.faces.requestScopeLock";
@@ -742,7 +744,6 @@ public class BridgeImpl
   	}
     return copy;
   }
-
   
   @SuppressWarnings("unchecked")
   private List<String> getExcludedAttributes(PortletRequest request)

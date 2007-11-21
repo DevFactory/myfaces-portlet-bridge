@@ -167,7 +167,8 @@ public class ActionResponseDecorator extends PortletResponseDecorator implements
    *              if the method is invoked after <code>sendRedirect</code> has been called.
    */
   // FIXME: When portlet API is Java 5 compliant, fix this generic issue
-  public void setRenderParameters(Map parameters)
+  @SuppressWarnings("unchecked")
+	public void setRenderParameters(Map parameters)
   {
     // mResponse is a protected memeber of PortletResponseDecorator
     ((ActionResponse) mResponse).setRenderParameters(parameters);
