@@ -429,6 +429,11 @@ public class PortletExternalContextImpl extends ExternalContext
       path = path.substring(0, path.lastIndexOf("/"));
       s = URLUtils.convertFromRelative(path, s);
     }
+    
+    // prepend the context path since portletResponse.encodeURL() requires a full path URI
+    // Don't need to check return from getRequestContextPath because there must
+    // always be a vlaue even if an empty string
+    s = getRequestContextPath() + s;
 
     String resourceURLStr = mPortletResponse.encodeURL(s);
 
@@ -1253,23 +1258,29 @@ public class PortletExternalContextImpl extends ExternalContext
   
   private boolean isAbsoluteURL(String url)
   {
-    if (url.startsWith("http"))
+    // Quick check for most common case
+    if (url.startsWith("http:") || url.startsWith("https:"))
     {
       return true;
     }
 
-    // now deal with other possible protocols
+    // now deal with other possible protocols -- find the potential scheme
     int i = url.indexOf(":");
     if (i == -1)
     {
       return false;
     }
-    int j = url.indexOf("/");
-    if (j != -1 && j > i)
-    {
-      return true;
-    }
-    return false;
+
+    // Now make sure that the  substring before the : is a valid scheme
+    // i.e. contains no URI reserved characters
+    String scheme = url.substring(0, i);
+
+    if (scheme.indexOf(";") != -1) return false;
+    else if (scheme.indexOf("/") != -1) return false;
+    else if (scheme.indexOf("#") != -1) return false;
+    else if (scheme.indexOf("?") != -1) return false;
+    else if (scheme.indexOf(" ") != -1) return false;
+    else return true; 
   }
 
   private boolean isExternalURL(String url)
