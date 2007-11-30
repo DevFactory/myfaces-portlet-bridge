@@ -1148,7 +1148,7 @@ public class PortletExternalContextImpl extends ExternalContext
                                        mPortletContext
                                                       .getInitParameter(ViewHandler.DEFAULT_SUFFIX_PARAM_NAME));
     }
-    if (isPrefixedMapped(url, mFacesMappings))
+    else if (isPrefixedMapped(url, mFacesMappings))
     {
       viewId = viewIdFromPrefixMapping(url, mFacesMappings);
     }
