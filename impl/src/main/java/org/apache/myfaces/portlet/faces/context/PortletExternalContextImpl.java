@@ -433,7 +433,11 @@ public class PortletExternalContextImpl extends ExternalContext
     // prepend the context path since portletResponse.encodeURL() requires a full path URI
     // Don't need to check return from getRequestContextPath because there must
     // always be a vlaue even if an empty string
-    s = getRequestContextPath() + s;
+    String ctxPath = getRequestContextPath();
+    if (ctxPath.length() > 0 && !s.startsWith(ctxPath))
+    {
+      s = ctxPath + s;
+    }
 
     String resourceURLStr = mPortletResponse.encodeURL(s);
 
