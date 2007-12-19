@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Map;
 
 import javax.el.ELContext;
+import javax.el.ELContextEvent;
+import javax.el.ELContextListener;
+
 import javax.faces.FacesException;
 import javax.faces.FactoryFinder;
 import javax.faces.application.Application;
@@ -124,19 +127,25 @@ public class PortletFacesContextImpl extends FacesContext
   {
     if (mElContext == null)
     {
-      mElContext = new PortletELContextImpl(getApplication().getELResolver());
+      Application app = getApplication();
+      mElContext = new PortletELContextImpl(app.getELResolver());
       mElContext.putContext(FacesContext.class, this);
       UIViewRoot root = getViewRoot();
       if (null != root)
       {
         mElContext.setLocale(root.getLocale());
       }
-      // TODO - The spec said that when an instance is created,
-      // implementation
-      // must call contextCreated() method of all the ELContextListener's,
-      // but the RI FacesContextImpl is not doing this, so not sure if
-      // it's
-      // necessary. We'll revisit this later
+      
+      // Now notify any listeners that we have created this context
+      ELContextListener[] listeners = app.getELContextListeners();
+      if (listeners.length > 0)
+      {
+        ELContextEvent event = new ELContextEvent(mElContext);
+        for (ELContextListener listener:listeners)
+        {
+          listener.contextCreated(event);
+        }
+      }
     }
     return mElContext;
   }
