@@ -35,6 +35,12 @@
       <groupId>org.apache.myfaces.portlet-bridge</groupId>
       <artifactId>portlet-bridge-api</artifactId>
     </dependency>
+
+    <!-- This gives us the J2EE5 Annotations like javax.annotation.PreDestroy -->
+    <dependency>
+      <groupId>org.apache.geronimo.specs</groupId>
+      <artifactId>geronimo-annotation_1.0_spec</artifactId>
+    </dependency>
   </dependencies>
   
   <distributionManagement>
