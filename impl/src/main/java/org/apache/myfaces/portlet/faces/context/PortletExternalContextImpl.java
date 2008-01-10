@@ -155,23 +155,6 @@ public class PortletExternalContextImpl extends ExternalContext
     // we need to set it for them
     setFacesMapping();
 
-    // Get the DelegateRender context parameter here and set as a request
-    // attribute
-    // so Bridge's ViewHandler has access to it. ViewHandler can't get from
-    // context
-    // itself because its a per portlet setting but without the config
-    // object
-    // the ViewHandler has no way to get the portlet's name.
-    Bridge.BridgeRenderPolicy renderPolicy = 
-      (Bridge.BridgeRenderPolicy) mPortletContext.getAttribute(Bridge.BRIDGE_PACKAGE_PREFIX
-                                                               + mPortletConfig.getPortletName()
-                                                               + "."
-                                                               + Bridge.RENDER_POLICY);
-    if (renderPolicy != null)
-    {
-      mPortletRequest.setAttribute(RENDER_POLICY_ATTRIBUTE, renderPolicy);
-    }
-
   }
 
   public void release()
@@ -263,7 +246,7 @@ public class PortletExternalContextImpl extends ExternalContext
       throw new FacesException("encodeActionURL:  unable to recognize viewId");
     }
 
-    if (mPhase == Bridge.PortletPhase.RenderPhase)
+    if (mPhase == Bridge.PortletPhase.RENDER_PHASE)
     { // render - write
       // the viewId into
       // the response
@@ -390,7 +373,7 @@ public class PortletExternalContextImpl extends ExternalContext
     // redirects within this app are dealt (elsewhere) as navigations
     // so do nothing. External links are redirected
 
-    if (mPhase == Bridge.PortletPhase.ActionPhase
+    if (mPhase == Bridge.PortletPhase.ACTION_PHASE
         && (url.startsWith("#") || isExternalURL(url) || isDirectLink(url)))
     {
       ((ActionResponse) getResponse()).sendRedirect(url);
@@ -455,7 +438,7 @@ public class PortletExternalContextImpl extends ExternalContext
       throw new java.lang.NullPointerException();
     }
 
-    if (mPhase == Bridge.PortletPhase.ActionPhase)
+    if (mPhase == Bridge.PortletPhase.ACTION_PHASE)
     {
       throw new IllegalStateException("Request cannot be an ActionRequest");
     }
@@ -652,7 +635,7 @@ public class PortletExternalContextImpl extends ExternalContext
 
   public String encodeNamespace(String s)
   {
-    if (!BridgeUtil.isPortletRenderRequest())
+    if (BridgeUtil.getPortletRequestPhase() != Bridge.PortletPhase.RENDER_PHASE)
     {
       throw new IllegalStateException("Only RenderResponse can be used to encode a namespace");
     }
@@ -787,7 +770,7 @@ public class PortletExternalContextImpl extends ExternalContext
     /* TODO: Temporary workaround for JIRA PORTLETBRIDGE-14 until EG
      * decides on best course of action.
      * 
-   if (mPhase != Bridge.PortletPhase.ActionPhase)
+   if (mPhase != Bridge.PortletPhase.ACTION_PHASE)
     {
           
         throw new IllegalStateException(
@@ -796,7 +779,7 @@ public class PortletExternalContextImpl extends ExternalContext
     */
     
   	//Part of temp workaround.  Do a noop if we are not in action phase
-    if(mPhase == Bridge.PortletPhase.ActionPhase)
+    if(mPhase == Bridge.PortletPhase.ACTION_PHASE)
     {
       ((ActionRequest) mPortletRequest).setCharacterEncoding(encoding);
     }
@@ -829,13 +812,15 @@ public class PortletExternalContextImpl extends ExternalContext
   @Override
   public String getRequestCharacterEncoding()
   {
-    if (mPhase == Bridge.PortletPhase.RenderPhase)
+    if (mPhase == Bridge.PortletPhase.ACTION_PHASE)
     {
-      throw new IllegalStateException(
-                                      "PortletExternalContextImpl.getRequestCharacterEncoding(): Request must be an ActionRequest");
+      return ((ActionRequest) mPortletRequest).getCharacterEncoding();
     }
-
-    return ((ActionRequest) mPortletRequest).getCharacterEncoding();
+    else
+    {
+      // RENDER_PHASE -- return null as per spec
+      return null;
+    }
   }
 
   /**
@@ -865,13 +850,15 @@ public class PortletExternalContextImpl extends ExternalContext
   @Override
   public String getRequestContentType()
   {
-    if (mPhase == Bridge.PortletPhase.RenderPhase)
+    if (mPhase == Bridge.PortletPhase.ACTION_PHASE)
     {
-      throw new IllegalStateException(
-                                      "PortletExternalContextImpl.getRequestContentType(): Request must be an ActionRequest");
+      return ((ActionRequest) mPortletRequest).getContentType();
     }
-
-    return ((ActionRequest) mPortletRequest).getContentType();
+    else
+    {
+      // RENDER_PHASE: return null as per spec
+      return null;
+    }
   }
 
   /**
@@ -902,7 +889,7 @@ public class PortletExternalContextImpl extends ExternalContext
   @Override
   public String getResponseCharacterEncoding()
   {
-    if (mPhase == Bridge.PortletPhase.ActionPhase)
+    if (mPhase == Bridge.PortletPhase.ACTION_PHASE)
     {
       throw new IllegalStateException(
                                       "PortletExternalContextImpl.getResponseCharacterEncoding(): Response must be a RenderRequest");
@@ -938,7 +925,7 @@ public class PortletExternalContextImpl extends ExternalContext
   @Override
   public String getResponseContentType()
   {
-    if (mPhase == Bridge.PortletPhase.ActionPhase)
+    if (mPhase == Bridge.PortletPhase.ACTION_PHASE)
     {
       throw new IllegalStateException(
                                       "PortletExternalContextImpl.getResponseContentType(): Response must be a RenderRequest");

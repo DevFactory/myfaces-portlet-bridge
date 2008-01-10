@@ -45,7 +45,7 @@ import javax.faces.render.RenderKit;
 import javax.faces.render.RenderKitFactory;
 import javax.portlet.PortletResponse;
 import javax.portlet.faces.Bridge;
-import javax.portlet.faces.component.PortletNamingContainer;
+import javax.portlet.faces.annotation.PortletNamingContainer;
 
 import org.apache.myfaces.portlet.faces.el.PortletELContextImpl;
 
@@ -273,7 +273,10 @@ public class PortletFacesContextImpl extends FacesContext
 
     mViewRoot = viewRoot;
 
-    if (mViewRoot instanceof PortletNamingContainer)
+    // if ViewRoot annotated with PortletNamingContainer
+    // it supports portlet namespacing content -- mark
+    // response so consumers can detect
+    if (mViewRoot.getClass().getAnnotation(PortletNamingContainer.class) != null)
     {
       try
       {

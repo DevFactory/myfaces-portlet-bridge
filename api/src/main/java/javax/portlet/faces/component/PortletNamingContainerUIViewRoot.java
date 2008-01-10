@@ -17,12 +17,14 @@ import javax.faces.component.NamingContainer;
 import javax.faces.component.UIViewRoot;
 import javax.faces.context.ExternalContext;
 
+import javax.portlet.faces.annotation.PortletNamingContainer;
+
 /**
  * Bridge ViewRoot that implements NamingContainer which uses the ExternalContext.encodeNamespace to
  * introduce the consumer namespace into tree components.
  */
-public class PortletNamingContainerUIViewRoot extends UIViewRoot implements PortletNamingContainer,
-    Serializable
+@PortletNamingContainer
+public class PortletNamingContainerUIViewRoot extends UIViewRoot implements Serializable
 {
 
   //TODO: This should be regenerated each time this is modified.  Can this be added to maven?

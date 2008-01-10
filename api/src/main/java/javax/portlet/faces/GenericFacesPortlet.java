@@ -16,6 +16,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import javax.portlet.ActionRequest;
 import javax.portlet.ActionResponse;
 import javax.portlet.GenericPortlet;
@@ -60,7 +63,7 @@ public class GenericFacesPortlet extends GenericPortlet
 {
   public static final String BRIDGE_CLASS             = Bridge.BRIDGE_PACKAGE_PREFIX
                                                         + "BridgeImplClass";
-  public static final String BRIDGE_SERVICE_CLASSPATH = "/META-INF/services/javax.portlet.faces.Bridge";
+  public static final String BRIDGE_SERVICE_CLASSPATH = "META-INF/services/javax.portlet.faces.Bridge";
 
   private Class<? extends Bridge> mFacesBridgeClass   = null;
   private Bridge                  mFacesBridge        = null;
@@ -96,29 +99,22 @@ public class GenericFacesPortlet extends GenericPortlet
       throw new PortletException("Configuration Error: Initial Parameter '" + BRIDGE_CLASS
                                  + "' is not defined for portlet: " + getPortletName());
     }
-
-    // Context level attribute for whether to encode redirect URL
-    String renderPolicy = getPortletConfig().getInitParameter(
-                                                              Bridge.BRIDGE_PACKAGE_PREFIX
-                                                                  + Bridge.RENDER_POLICY);
-    if (renderPolicy != null)
+    
+    // Get the other bridge configuration parameters and set as context attributes
+    List<String> excludedAttrs = getExcludedRequestAttributes();
+    if (excludedAttrs != null)
     {
       getPortletContext().setAttribute(
                                        Bridge.BRIDGE_PACKAGE_PREFIX + getPortletName() + "."
-                                           + Bridge.RENDER_POLICY,
-                                       Bridge.BridgeRenderPolicy.valueOf(renderPolicy));
+                                           + Bridge.EXCLUDED_REQUEST_ATTRIBUTES,
+                                       excludedAttrs);
     }
-    String preserveActionParams = getPortletConfig()
-                                                    .getInitParameter(
-                                                                      Bridge.BRIDGE_PACKAGE_PREFIX
-                                                                          + Bridge.PRESERVE_ACTION_PARAMS);
-    if (preserveActionParams != null)
-    {
-      getPortletContext().setAttribute(
-                                       Bridge.BRIDGE_PACKAGE_PREFIX + getPortletName() + "."
-                                           + Bridge.PRESERVE_ACTION_PARAMS,
-                                       Boolean.valueOf(preserveActionParams));
-    }
+    
+    Boolean preserveActionParams = getPreserveActionParameters();
+    getPortletContext().setAttribute(
+                                      Bridge.BRIDGE_PACKAGE_PREFIX + getPortletName() + "."
+                                      + Bridge.PRESERVE_ACTION_PARAMS,
+                                      preserveActionParams);
 
     // Don't instanciate/initialize the bridge yet. Do it on first use
   }
@@ -191,6 +187,59 @@ public class GenericFacesPortlet extends GenericPortlet
                                                                            IOException
   {
     doBridgeDispatch(request, response, getDefaultViewId(request, request.getPortletMode()));
+  }
+
+  /**
+   * Returns the set of RequestAttribute names that the portlet wants the bridge to
+   * exclude from its managed request scope.  This default implementation picks up
+   * this list from the comma delimited init_param javax.portlet.faces.excludedRequestAttributes.
+   * 
+   * @return a List containing the names of the attributes to be excluded. null if it can't be
+   *         determined.
+   */
+  public List<String> getExcludedRequestAttributes()
+  {
+    String excludedAttrs = getPortletConfig()
+                              .getInitParameter(
+                                Bridge.BRIDGE_PACKAGE_PREFIX
+                                + Bridge.EXCLUDED_REQUEST_ATTRIBUTES);
+    if (excludedAttrs == null)  
+    {
+      return null;
+    }
+    
+    String[] attrArray = excludedAttrs.split(",");
+    // process comma delimited String into a List
+    ArrayList<String> list = new ArrayList(attrArray.length);
+    for (int i = 0; i < attrArray.length; i++)
+    {
+      list.add(attrArray[i]);
+    }
+    return list;
+  }
+
+  /**
+   * Returns a boolean indicating whether or not the bridge should preserve all the
+   * action parameters in the subsequent renders that occur in the same scope.  This
+   * default implementation reads the values from the portlet init_param
+   * javax.portlet.faces.preserveActionParams.  If not present, false is returned.
+   * 
+   * @return a boolean indicating whether or not the bridge should preserve all the
+   * action parameters in the subsequent renders that occur in the same scope.
+   */
+  public Boolean getPreserveActionParameters()
+  {
+    String preserveActionParams = getPortletConfig()
+                                    .getInitParameter(
+                                      Bridge.BRIDGE_PACKAGE_PREFIX);
+    if (preserveActionParams == null)
+    {
+      return Boolean.FALSE;
+    }
+    else
+    {
+      return Boolean.valueOf(preserveActionParams);
+    }
   }
 
   /**

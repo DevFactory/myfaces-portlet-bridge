@@ -181,7 +181,7 @@ public class PortletRequestHeaders
       }
     }
 
-    if ((Bridge.PortletPhase) mPortletRequest.getAttribute(Bridge.PORTLET_LIFECYCLE_PHASE) == Bridge.PortletPhase.ActionPhase)
+    if ((Bridge.PortletPhase) mPortletRequest.getAttribute(Bridge.PORTLET_LIFECYCLE_PHASE) == Bridge.PortletPhase.ACTION_PHASE)
     {
 
       if (!containsHeader(mHeaderNames, "CONTENT-TYPE"))
@@ -220,6 +220,16 @@ public class PortletRequestHeaders
         }
       }
 
+    }
+    // Technically don't need this test here but I will forget to change this code when
+    // JSR 286 is supported and there are more phases.
+    else if ((Bridge.PortletPhase) mPortletRequest.getAttribute(Bridge.PORTLET_LIFECYCLE_PHASE) == Bridge.PortletPhase.RENDER_PHASE)
+    {
+      // its the RENDER_PHASE -- spec says we must remove the CONTENT_TYPE if 
+      // came in the request -- so it matches null return from
+      // EC.getRequestContentType/CharacterSetEncoding
+      mHeaders.remove("CONTENT-TYPE");
+      mHeaderNames.remove("CONTENT-TYPE");
     }
 
     return true;

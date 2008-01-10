@@ -33,31 +33,10 @@ public class BridgeUtil
     }
   }
   
-  public static boolean isPortletActionRequest() 
+  public static Bridge.PortletPhase getPortletRequestPhase() 
   {
     Map<String, Object> m = FacesContext.getCurrentInstance().getExternalContext().getRequestMap();
-    Bridge.PortletPhase phase = (Bridge.PortletPhase) m.get(Bridge.PORTLET_LIFECYCLE_PHASE);
-    if (phase != null && phase == Bridge.PortletPhase.ActionPhase)
-    {
-      return true;
-    }
-    else 
-    {
-      return false;
-    }
+    return (Bridge.PortletPhase) m.get(Bridge.PORTLET_LIFECYCLE_PHASE);
   }
   
-  public static boolean isPortletRenderRequest() 
-  {
-    Map<String, Object> m = FacesContext.getCurrentInstance().getExternalContext().getRequestMap();
-    Bridge.PortletPhase phase = (Bridge.PortletPhase) m.get(Bridge.PORTLET_LIFECYCLE_PHASE);
-    if (phase != null && phase == Bridge.PortletPhase.RenderPhase)
-    {
-      return true;
-    }
-    else 
-    {
-      return false;
-    }
-  }
 }

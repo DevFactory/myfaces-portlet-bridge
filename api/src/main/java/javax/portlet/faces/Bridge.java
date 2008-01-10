@@ -54,6 +54,8 @@ public interface Bridge
 
   public static final String MAX_MANAGED_REQUEST_SCOPES    = BRIDGE_PACKAGE_PREFIX
                                                              + "MAX_MANAGED_REQUEST_SCOPES";
+  public static final String RENDER_POLICY                 = BRIDGE_PACKAGE_PREFIX
+                                                              + "RENDER_POLICY";
 
   public static final String LIFECYCLE_ID                  = "javax.faces.LIFECYCLE_ID";
 
@@ -82,12 +84,9 @@ public interface Bridge
   // request scope and restore them as parameters in the subsequent renders
   public static final String PRESERVE_ACTION_PARAMS        = "preserveActionParams";
 
-  // allows a portlet to control render delgation. A value of "ALWAYS_DELEGATE" indicates
-  // the bridge doesn't render itself, it merely delegates. A value of "NEVER_DELEGATE"
-  // indicates the bridge never delegates, rather it always overrides and renders.
-  // A value of "DEFAULT" indicates the bridge will delegate first and only render
-  // if the delegatee throws an exception/throwable.
-  public static final String RENDER_POLICY                 = "renderPolicy";
+  // allows a portlet to which request attributes the bridge excludes from its
+  // managed request scope.
+  public static final String EXCLUDED_REQUEST_ATTRIBUTES    = "excludedRequestAttributes";
 
   // Parameter that can be added to an ActionURL to signify it is a direct link
   // and hence shouldn't be encoded by encodeActionURL as an actionURL
@@ -127,7 +126,7 @@ public interface Bridge
 
   public static enum PortletPhase
   {
-    ActionPhase, RenderPhase, ;
+    ACTION_PHASE, RENDER_PHASE, ;
   }
 
   public static enum BridgeRenderPolicy

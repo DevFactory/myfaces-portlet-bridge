@@ -17,7 +17,8 @@
     specific language governing permissions and limitations
     under the License.	   
 -->
-<faces-config version="1.2" xmlns="http://java.sun.com/xml/ns/javaee">
+<faces-config version="1.2" xmlns="http://java.sun.com/xml/ns/javaee"
+    xmlns:bridge="http://www.apache.org/myfaces/xml/ns/bridge/bridge-extension">
     <application>
         <view-handler>org.apache.myfaces.portlet.faces.application.PortletViewHandlerImpl</view-handler>
         <state-manager>org.apache.myfaces.portlet.faces.application.PortletStateManagerImpl</state-manager>

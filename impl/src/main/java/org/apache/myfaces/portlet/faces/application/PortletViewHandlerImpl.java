@@ -36,11 +36,13 @@ import javax.faces.context.FacesContext;
 import javax.faces.context.ResponseWriter;
 import javax.faces.render.RenderKit;
 import javax.faces.render.RenderKitFactory;
+
+import javax.portlet.PortletContext;
 import javax.portlet.RenderResponse;
 import javax.portlet.faces.Bridge;
 import javax.portlet.faces.BridgeUtil;
+import javax.portlet.faces.annotation.PortletNamingContainer;
 import javax.portlet.faces.component.PortletNamingContainerUIViewRoot;
-import org.apache.myfaces.portlet.faces.context.PortletExternalContextImpl;
 
 /**
  * View handler implementation for JSF portlet bridge.
@@ -58,6 +60,7 @@ public class PortletViewHandlerImpl extends ViewHandlerWrapper
 
   // the ViewHandler to delegate to
   private ViewHandler mDelegate;
+  private Bridge.BridgeRenderPolicy mRenderPolicy = null;
 
   public PortletViewHandlerImpl(ViewHandler handler)
   {
@@ -81,7 +84,10 @@ public class PortletViewHandlerImpl extends ViewHandlerWrapper
 
     UIViewRoot viewRoot = super.createView(facesContext, viewId);
 
-    if (viewRoot.getClass() != UIViewRoot.class)
+    // Use the delegatees UIViewRoot if its not the native Faces one
+    // or it already implements the PortletNamingContainer behavior
+    if ((viewRoot.getClass() != UIViewRoot.class) || 
+        (viewRoot.getClass().getAnnotation(PortletNamingContainer.class) != null))
     {
       return viewRoot;
     }
@@ -105,24 +111,27 @@ public class PortletViewHandlerImpl extends ViewHandlerWrapper
       return;
     }
 
-    // Get the renderPolicy from the requestScope
-    Bridge.BridgeRenderPolicy renderPolicy = (Bridge.BridgeRenderPolicy) context
-                                                                                .getExternalContext()
-                                                                                .getRequestMap()
-                                                                                .get(
-                                                                                     PortletExternalContextImpl.RENDER_POLICY_ATTRIBUTE);
-
-    if (renderPolicy == null)
+    // If first time -- Get the renderPolicy from the context init parameter 
+    if (mRenderPolicy == null)
     {
-      renderPolicy = Bridge.BridgeRenderPolicy.valueOf("DEFAULT");
+      PortletContext pCtx = (PortletContext) context.getExternalContext().getContext();
+      String policy = pCtx.getInitParameter(Bridge.RENDER_POLICY);
+      if (policy != null)
+      {
+        mRenderPolicy = Bridge.BridgeRenderPolicy.valueOf(policy);
+      }
+      else
+      {
+        mRenderPolicy = Bridge.BridgeRenderPolicy.DEFAULT;
+      }
     }
 
-    if (renderPolicy == Bridge.BridgeRenderPolicy.ALWAYS_DELEGATE)
+    if (mRenderPolicy == Bridge.BridgeRenderPolicy.ALWAYS_DELEGATE)
     {
       super.renderView(context, viewToRender);
       return;
     }
-    else if (renderPolicy == Bridge.BridgeRenderPolicy.DEFAULT)
+    else if (mRenderPolicy == Bridge.BridgeRenderPolicy.DEFAULT)
     {
       try
       {
@@ -237,11 +246,11 @@ public class PortletViewHandlerImpl extends ViewHandlerWrapper
     {
       if (content instanceof char[])
       {
-        renderResponse.getWriter().write(new String((byte[]) content));
+        renderResponse.getWriter().write(new String((char[]) content));
       }
       else if (content instanceof byte[])
       {
-        renderResponse.getWriter().write(new String((char[]) content));
+        renderResponse.getWriter().write(new String((byte[]) content));
       }
       else
       {

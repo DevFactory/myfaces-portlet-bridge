@@ -21,6 +21,11 @@ package org.apache.myfaces.portlet.faces.bridge;
 
 import java.io.IOException;
 import java.io.Serializable;
+
+import java.lang.reflect.Method;
+
+import java.net.URL;
+
 import java.rmi.server.UID;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +34,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -65,9 +71,15 @@ import javax.portlet.RenderRequest;
 import javax.portlet.RenderResponse;
 import javax.portlet.faces.Bridge;
 import javax.portlet.faces.BridgeException;
+import javax.portlet.faces.annotation.BridgePreDestroy;
+import javax.portlet.faces.annotation.BridgeRequestScopeAttributeAdded;
+import javax.portlet.faces.annotation.ExcludeFromManagedRequestScope;
+
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletRequest;
+import javax.servlet.ServletRequestAttributeEvent;
+import javax.servlet.ServletRequestAttributeListener;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionBindingEvent;
@@ -75,10 +87,11 @@ import javax.servlet.http.HttpSessionBindingListener;
 
 import org.apache.myfaces.portlet.faces.bridge.wrapper.BridgeRenderRequestWrapper;
 import org.apache.myfaces.portlet.faces.context.PortletExternalContextImpl;
+import org.apache.myfaces.portlet.faces.util.config.FacesConfigurationProcessor;
 import org.apache.myfaces.portlet.faces.util.config.WebConfigurationProcessor;
 
 public class BridgeImpl
-  implements Bridge, ELContextListener, PhaseListener
+  implements Bridge, ELContextListener, PhaseListener, ServletRequestAttributeListener
 {
 	private static final long	serialVersionUID	= 5807626987246270989L;
 
@@ -91,10 +104,12 @@ public class BridgeImpl
   private static final String FACES_VIEWROOT = "org.apache.myfaces.portlet.faces.facesViewRoot";
   private static final String FACES_MESSAGES = "org.apache.myfaces.portlet.faces.facesMessages";
   private static final String REQUEST_PARAMETERS = "org.apache.myfaces.portlet.faces.requestParameters";
+  private static final String PREEXISTING_ATTRIBUTE_NAMES = "org.apache.myfaces.portlet.faces.preExistingAttributeNames";
   private static final String REQUEST_SCOPE_ID_RENDER_PARAM = "_bridgeRequestScopeId";
   private static final int DEFAULT_MAX_MANAGED_REQUEST_SCOPES = 100;
 
-  private boolean mPreserveActionParams = false;
+  private Boolean mPreserveActionParams = false;
+  private List<String> mExcludedRequestAttributes = null;
 
   private PortletConfig mPortletConfig = null;
   private FacesContextFactory mFacesContextFactory = null;
@@ -115,17 +130,25 @@ public class BridgeImpl
     mPortletConfig = config;
     PortletContext portletContext = mPortletConfig.getPortletContext();
 
-    // get preserveActionParams here because we use later in this class.
-    // however don't process renderPolicy here because its used in
-    // ViewHandler (and needs to be at request scope) -- hence this
-    // is done in ExternalContext.
-    Boolean configParam = 
-      (Boolean) portletContext.getAttribute(Bridge.BRIDGE_PACKAGE_PREFIX + mPortletConfig.getPortletName() + 
+    // get preserveActionParams and excludedAttributes configuration settings.
+    mPreserveActionParams = (Boolean) portletContext.getAttribute(Bridge.BRIDGE_PACKAGE_PREFIX + mPortletConfig.getPortletName() + 
                                             "." + Bridge.PRESERVE_ACTION_PARAMS);
-    if (configParam != null)
+    
+    mExcludedRequestAttributes = (List <String>) portletContext.getAttribute(Bridge.BRIDGE_PACKAGE_PREFIX + mPortletConfig.getPortletName() + 
+                                            "." + Bridge.EXCLUDED_REQUEST_ATTRIBUTES);
+    if (mExcludedRequestAttributes != null)
     {
-      mPreserveActionParams = configParam.booleanValue();
+      // copy the list as we may be adding to it and don't want to worry that this might be immutable
+      mExcludedRequestAttributes = new ArrayList(mExcludedRequestAttributes);     
     }
+    else
+    {
+      // Otherwise create an empty list
+      mExcludedRequestAttributes = new ArrayList(5);
+    }
+   
+    // Read excludedAttributes that may be defined in any face-config.xml
+    readExcludedAttributesFromFacesConfig(portletContext, mExcludedRequestAttributes);
 
     // Set up the synchronziation object for the RequestScopeMap as we don't
     // want to sync on the PortletContext because its too broad. Note:
@@ -158,6 +181,10 @@ public class BridgeImpl
     // ExternalContext
     WebConfigurationProcessor webConfig = new WebConfigurationProcessor(portletContext);
     mFacesMappings = webConfig.getFacesMappings();
+    if (mFacesMappings == null || mFacesMappings.size() == 0)
+    {
+      throw new BridgeException("BridgeImpl.init(): unable to determine Faces servlet web.xml mapping.");
+    }
     for (int i = 0; i < mFacesMappings.size(); i++)
     {
       portletContext.log("Mapping: " + mFacesMappings.get(i));
@@ -171,7 +198,7 @@ public class BridgeImpl
     // available to Faces extensions -- allowing that code to NOT rely on
     // instanceof which can fail if a portlet container uses a single class
     // to implement both the action and render request/response objects
-    request.setAttribute(Bridge.PORTLET_LIFECYCLE_PHASE, Bridge.PortletPhase.ActionPhase);
+    request.setAttribute(Bridge.PORTLET_LIFECYCLE_PHASE, Bridge.PortletPhase.ACTION_PHASE);
 
     // Set the FacesServletMapping attribute so the ExternalContext can
     // pick it up and use it to reverse map viewIds to paths
@@ -186,9 +213,15 @@ public class BridgeImpl
     // acquiring the FacesContext because its possible (though unlikely)
     // the application has inserted itself in this process and sets up
     // needed request attributes.
-    List<String> excludedAttributes = getExcludedAttributes(request);
+    List<String> preExistingAttributes = getRequestAttributes(request);
+    // place on the request for use here and in the servletRequestAttributeListener
+    if (preExistingAttributes != null)
+    {
+      request.setAttribute(PREEXISTING_ATTRIBUTE_NAMES, preExistingAttributes);
+    }
 
     FacesContext context = null;
+    String scopeId = null;
     try
     {
       // Get the FacesContext instance for this request
@@ -198,7 +231,7 @@ public class BridgeImpl
       // Each action starts a new "action lifecycle"
       // The Bridge preserves request scoped data and if so configured
       // Action Parameters for the duration of an action lifecycle
-      String scopeId = initBridgeRequestScope(request, response);
+      scopeId = initBridgeRequestScope(request, response);
 
       // For actions we only execute the lifecycle phase
       getLifecycle().execute(context);
@@ -231,7 +264,7 @@ public class BridgeImpl
         // within the same request scope but Faces does (assumes this),
         // preserve the request scope data and the Faces view tree at
         // RequestScope.
-        saveBridgeRequestScopeData(context, scopeId, excludedAttributes);
+        saveBridgeRequestScopeData(context, scopeId, preExistingAttributes);
 
         // Finalize the action response -- key here is the reliance on
         // ExternalContext.encodeActionURL to migrate info encoded
@@ -259,11 +292,51 @@ public class BridgeImpl
     }
     finally
     {
+      dumpScopeId(scopeId, "ACTION_PHASE");
+      // our servletrequestattributelistener uses this as an indicator of whether 
+      // its actively working on a request -- remove it to indicate we are done
+      request.removeAttribute(Bridge.PORTLET_LIFECYCLE_PHASE);
       if (context != null)
       {
         context.release();
       }
     }
+  }
+  
+  private void dumpScopeId(String scopeId, String phase)
+  {
+    // Get the data from the scope
+    PortletContext ctx = mPortletConfig.getPortletContext();
+    ctx.log("dumpScopeId: " + phase);
+    synchronized (ctx.getAttribute(REQUEST_SCOPE_LOCK))
+    {
+      // get the managedScopeMap
+      LRUMap requestScopeMap = (LRUMap) ctx.getAttribute(REQUEST_SCOPE_MAP);
+      // No scope for all renders before first action to this portletApp
+      if (requestScopeMap == null)
+      {
+        ctx.log("There are No saved scoped.  Can't match: "+ scopeId);
+        return;
+      }
+
+      Map<String, Object> m = requestScopeMap.get(scopeId);
+      if (m == null)
+      {
+        ctx.log("Can't match scope: "+ scopeId);
+        return;
+      }
+      
+      Set<Map.Entry<String,Object>> set = m.entrySet();
+      Iterator<Map.Entry<String,Object>> i = set.iterator();
+      ctx.log("Elements in scope: " + scopeId);
+      while (i.hasNext())
+      {
+        Map.Entry<String,Object> entry = i.next();
+        ctx.log("     " + entry.getKey());
+      }
+      ctx.log("end dumpScopeId");
+    }
+       
   }
 
   public void doFacesRequest(RenderRequest request, RenderResponse response)
@@ -275,7 +348,7 @@ public class BridgeImpl
     // available to Faces extensions -- allowing that code to NOT rely on
     // instanceof which can fail if a portlet container uses a single class
     // to implement both the action and render request/response objects
-    request.setAttribute(Bridge.PORTLET_LIFECYCLE_PHASE, Bridge.PortletPhase.RenderPhase);
+    request.setAttribute(Bridge.PORTLET_LIFECYCLE_PHASE, Bridge.PortletPhase.RENDER_PHASE);
 
     // Set the FacesServletMapping attribute so the ExternalContext can
     // pick it up and use it to reverse map viewIds to paths
@@ -391,6 +464,10 @@ public class BridgeImpl
     }
     finally
     {
+      dumpScopeId(scopeId, "RENDER_PHASE");
+      // our servletrequestattributelistener uses this as an indicator of whether 
+      // its actively working on a request -- remove it to indicate we are done
+      request.removeAttribute(Bridge.PORTLET_LIFECYCLE_PHASE);
       if (context != null)
       {
         context.release();
@@ -420,6 +497,82 @@ public class BridgeImpl
     if (elContext.getContext(PortletConfig.class) == null)
     {
       elContext.putContext(PortletConfig.class, mPortletConfig);
+    }
+  }
+  
+  /*
+   * ServletRequestAttributeListener implementation
+   */
+  public void attributeAdded(ServletRequestAttributeEvent srae)
+  {
+    // use this phase attribute as an indicator of whether 
+    // we are actively working on a request
+    PortletPhase phase = (PortletPhase) srae.getServletRequest().getAttribute(Bridge.PORTLET_LIFECYCLE_PHASE);
+    
+    // do nothing if before/after bridge processing or in the render phase.
+    // Don't care about render phase because we don't update/change the managed
+    // scope based on changes during render.
+    // ALSO: do nothing if not in the Bridge's managed request scope
+    if (phase == null || phase == PortletPhase.RENDER_PHASE ||
+        isExcludedFromBridgeRequestScope(srae.getName(),
+                                               srae.getValue(),
+                                               (List<String>)
+                                                  srae.getServletRequest().getAttribute(PREEXISTING_ATTRIBUTE_NAMES)))
+    {
+      return;
+    }
+    
+    // Otherwise -- see if the added attribute implements the bridge's 
+    // BridgeRequestScopeAdded annotation -- call each method so annotated
+    Object o = srae.getValue();
+    Method[] methods = o.getClass().getMethods();
+    for (int i = 0; i < methods.length; i++)
+    {
+      if (methods[i].isAnnotationPresent(BridgeRequestScopeAttributeAdded.class))
+      {
+        try
+        {
+          methods[i].invoke(o, null);
+        }
+        catch (Exception e)
+        {
+            // TODO: log problem
+            // do nothing and forge ahead
+            ;
+        }
+      }
+    }
+  }
+  
+  public void attributeRemoved(ServletRequestAttributeEvent srae)
+  {
+    // use this phase attribute as an indicator of whether 
+    // we are actively working on a request
+    PortletPhase phase = (PortletPhase) srae.getServletRequest().getAttribute(Bridge.PORTLET_LIFECYCLE_PHASE);
+    
+    // If in an action this means the attribute has been removed before we have
+    // saved the action scope -- since the managed bean has been informed we are
+    // running in a portlet environment it should have ignored the PreDestroy.
+    // To make up for this we call its BridgePredestroy
+    if (phase != null && phase == PortletPhase.ACTION_PHASE)
+    {
+      notifyPreDestroy(srae.getValue()); // in outerclass (BridgeImpl)
+    }
+  }
+  
+  public void attributeReplaced(ServletRequestAttributeEvent srae)
+  {
+    // use this phase attribute as an indicator of whether 
+    // we are actively working on a request
+    PortletPhase phase = (PortletPhase) srae.getServletRequest().getAttribute(Bridge.PORTLET_LIFECYCLE_PHASE);
+    
+    // If in an action this means the attribute has been replaced before we have
+    // saved the action scope -- since the managed bean has been informed we are
+    // running in a portlet environment it should have ignored the PreDestroy.
+    // To make up for this we call its BridgePredestroy
+    if (phase != null && phase == PortletPhase.ACTION_PHASE)
+    {
+      notifyPreDestroy(srae.getValue()); // in outerclass (BridgeImpl)
     }
   }
 
@@ -503,7 +656,7 @@ public class BridgeImpl
     ExternalContext ec = context.getExternalContext();
     Map<String, Object> requestMap = ec.getRequestMap();
     Map<String, String[]> requestParameterMap = ec.getRequestParameterValuesMap();
-    if (!mPreserveActionParams)
+    if (mPreserveActionParams == Boolean.FALSE)
     {
       if (requestMap != null && requestParameterMap != null && 
           requestParameterMap.containsKey(ResponseStateManager.VIEW_STATE_PARAM))
@@ -545,8 +698,16 @@ public class BridgeImpl
 
       if (requestScopeMap == null)
       {
-        requestScopeMap = createRequestScopeMap(portletContext);
-        portletContext.setAttribute(REQUEST_SCOPE_MAP, requestScopeMap);
+        // Have only done renders to this point -- so no scope to update
+        return;
+      }
+      
+      // now see if this scope is in the Map
+      Map<String, Object> scopeMap = requestScopeMap.get(scopeId);
+      if (scopeMap == null)
+      {
+        // Scope has been previously removed -- so no scope to update
+        return;
       }
 
       // Prepare the value for storing as a preserved parameter
@@ -555,19 +716,6 @@ public class BridgeImpl
       String[] values = new String[1];
       values[0] = updatedViewStateParam;
 
-      // now see if this scope is in the Map
-      Map<String, Object> scopeMap = requestScopeMap.get(scopeId);
-      
-      Boolean isNew = false;
-
-      if (scopeMap == null) 
-      {
-        // allocate a Map  and put
-        scopeMap = new HashMap<String, Object>(1);
-        // delay adding to requestScopeMap until populated
-        isNew = true;
-      }
-      
       // Now get the RequestParameters from the scope
       @SuppressWarnings("unchecked")
       Map<String, String[]> requestParams = (Map<String, String[]>)scopeMap.get(REQUEST_PARAMETERS);
@@ -579,19 +727,9 @@ public class BridgeImpl
       }
       // finally update the value in the Map
       requestParams.put(ResponseStateManager.VIEW_STATE_PARAM, values);
-      
-      //TODO: We delay putting this on the map in case an exception occurs in the above
-      //      code.  The above code should never generate an exception, however, so this
-      //      could be simplified.
-      // if a newly allocated scope -- don't forget to add it in
-      if (isNew)
-      {
-        requestScopeMap.put(scopeId, scopeMap);
-      }
-      
     }
-
   }
+  
   
   private LRUMap createRequestScopeMap(PortletContext portletContext) 
   {
@@ -692,12 +830,12 @@ public class BridgeImpl
   }
 
   private void saveBridgeRequestScopeData(FacesContext context, String scopeId, 
-                                          List<String> excludeList)
+                                          List<String> preExistingList)
   {
 
     // Store the RequestMap @ the bridge's request scope
     putBridgeRequestScopeData(scopeId, 
-                              copyRequestMap(context.getExternalContext().getRequestMap(), excludeList));
+                              copyRequestMap(context.getExternalContext().getRequestMap(), preExistingList));
 
     // flag the data so can remove it if the session terminates
     // as its unlikely useful if the session disappears
@@ -725,7 +863,7 @@ public class BridgeImpl
     }
   }
 
-  private Map<String, Object> copyRequestMap(Map<String, Object> m, List<String> excludeList)
+  private Map<String, Object> copyRequestMap(Map<String, Object> m, List<String> preExistingList)
   {
     Map<String, Object> copy = new HashMap<String, Object>(m.size());
      
@@ -736,8 +874,7 @@ public class BridgeImpl
       // Don't copy any of the portlet or Faces objects
   		String key = entry.getKey();
   		Object value = entry.getValue();
-  		if(!excludeList.contains(key) &&
-  			 !contextObject(key, value))
+  		if(!isExcludedFromBridgeRequestScope(key, value, preExistingList))
   		{
   			copy.put(key, value);
   		}
@@ -746,12 +883,20 @@ public class BridgeImpl
   }
   
   @SuppressWarnings("unchecked")
-  private List<String> getExcludedAttributes(PortletRequest request)
+  private List<String> getRequestAttributes(PortletRequest request)
   {
   	return Collections.list((Enumeration<String>)request.getAttributeNames());
   }
+  
+  private boolean isExcludedFromBridgeRequestScope(String key, Object value, List<String> preExistingList)
+  {
+    return ((value.getClass().getAnnotation(ExcludeFromManagedRequestScope.class) != null) ||
+         (preExistingList != null && preExistingList.contains(key)) ||
+         isPreDefinedExcludedObject(key, value) ||
+         isConfiguredExcludedAttribute(key));
+  }
 
-  private boolean contextObject(String s, Object o)
+  private boolean isPreDefinedExcludedObject(String s, Object o)
   {
     return o instanceof PortletConfig || o instanceof PortletContext || 
       o instanceof PortletRequest || o instanceof PortletResponse || o instanceof PortletSession || 
@@ -763,10 +908,36 @@ public class BridgeImpl
       isInNamespace(s, "javax.faces.") ||
       isInNamespace(s, "javax.servlet.") ||
       isInNamespace(s, "javax.servlet.include.") ||
-      // TODO: remove once support configuring these
-      s.startsWith("org.apache.myfaces.trinidad.") ||
-      s.startsWith("com.sun.faces.");
+      s.equals(PREEXISTING_ATTRIBUTE_NAMES);
     }
+  
+  private boolean isConfiguredExcludedAttribute(String s)
+  {
+    if (mExcludedRequestAttributes == null)
+    {
+      return false;
+    }
+    
+    if (mExcludedRequestAttributes.contains(s))
+    {
+      return true;
+    }
+    
+    // No direct match -- walk through this list and process namespace checks
+    Iterator<String> i = mExcludedRequestAttributes.iterator();
+    while (i.hasNext())
+    {
+      String exclude = i.next();
+      if (exclude.endsWith("*"))
+      {
+        if (isInNamespace(s, exclude.substring(0, exclude.length() - 1)))
+        {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
       
   private boolean isInNamespace(String s, String namespace)
   {
@@ -927,6 +1098,39 @@ public class BridgeImpl
     // correctly.
     context.getExternalContext().redirect(encodedActionURL);
   }
+  
+  // notify this scope's attributes that they are being removed
+  private void notifyPreDestroy(Map<String,Object> scope)
+  {
+    Set<Map.Entry<String,Object>>  s = scope.entrySet();
+    Iterator<Map.Entry<String,Object>> i = s.iterator();
+    while (i.hasNext())
+    {
+      notifyPreDestroy(i.next().getValue());
+    }
+  }
+  
+  // notify this scope's attributes that they are being removed
+  private void notifyPreDestroy(Object o)
+  {
+    Method[] methods = o.getClass().getMethods();
+    for (int m = 0; m < methods.length; m++)
+    {
+      if (methods[m].isAnnotationPresent(BridgePreDestroy.class))
+      {
+        try
+        {
+          methods[m].invoke(o, null);
+        }
+        catch (Exception e)
+        {
+            // TODO: log problem
+            // do nothing and forge ahead
+            ;
+        }
+      }
+    }
+  }
 
   private void removeRequestScopes(String scopePrefix)
   {
@@ -956,6 +1160,28 @@ public class BridgeImpl
           	iterator.remove();
           }
       	}
+      }
+    }
+  }
+  
+  private void readExcludedAttributesFromFacesConfig(PortletContext context,
+                                                     List<String> excludedAttributes)
+  {
+    FacesConfigurationProcessor processor = new FacesConfigurationProcessor(context);
+    List<String> list = processor.getExcludedAttributes();
+    
+    if (list == null)
+    {
+      return;
+    }
+    
+    ListIterator<String> i = (ListIterator<String>) list.listIterator();
+    while (i.hasNext())
+    {
+      String attr = i.next();
+      if (!excludedAttributes.contains(attr))
+      {
+        excludedAttributes.add(attr);
       }
     }
   }
@@ -1001,7 +1227,33 @@ public class BridgeImpl
     @Override
     protected boolean removeEldestEntry(Map.Entry<String, Map<String,Object>> eldest)
     {
-      return size() > mMaxCapacity;
+      // manually remove the entry so we can ensure notifyPreDestroy is only
+      // called once
+      if (size() > mMaxCapacity)
+      {
+        // side effect of this call is to notify PreDestroy
+        remove(eldest.getKey());
+      }
+      return false;
+    }
+    
+    public Map<String,Object> remove(String key) 
+    {
+      dumpScopeId(key, "RemovePhase");
+      Map<String,Object> o = super.remove(key);
+      // notify attributes maintained in this object (map) they are going away
+      // Method in the outer BridgeImpl class
+      if (o != null) notifyPreDestroy(o);
+      return o;
+    }
+    
+    public Map<String,Object> put(String key, Map<String,Object> value)
+    {
+      Map<String,Object> o = super.put(key, value);
+      // notify attributes maintained in this object (map) they are going away
+      // Method in the outer BridgeImpl class
+      if (o != null) notifyPreDestroy(o);
+      return o;      
     }
 
   }
