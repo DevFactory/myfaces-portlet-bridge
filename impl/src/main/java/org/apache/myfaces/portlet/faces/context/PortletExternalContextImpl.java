@@ -388,38 +388,41 @@ public class PortletExternalContextImpl extends ExternalContext
   public String encodeResourceURL(String s)
   {
 
-    if (!isExternalURL(s) && !s.startsWith("/"))
+    if (!isExternalURL(s))
     {
-      // must be a relative path -- convert it to contextPath relative
-      // construct our cwd (servletPath + pathInfo);
-      String pi = null;
-      String path = getRequestServletPath();
-      if (path == null)
+      if (!s.startsWith("/"))
       {
-        path = getRequestPathInfo();
-      }
-      else
-      {
-        pi = getRequestPathInfo();
-      }
+        // must be a relative path -- convert it to contextPath relative
+        // construct our cwd (servletPath + pathInfo);
+        String pi = null;
+        String path = getRequestServletPath();
+        if (path == null)
+        {
+          path = getRequestPathInfo();
+        }
+        else
+        {
+          pi = getRequestPathInfo();
+        }
 
-      if (pi != null)
-      {
-        path = path.concat(pi);
-      }
+        if (pi != null)
+        {
+          path = path.concat(pi);
+        }
 
-      // remove target
-      path = path.substring(0, path.lastIndexOf("/"));
-      s = URLUtils.convertFromRelative(path, s);
-    }
+        // remove target
+        path = path.substring(0, path.lastIndexOf("/"));
+        s = URLUtils.convertFromRelative(path, s);
+      }
     
-    // prepend the context path since portletResponse.encodeURL() requires a full path URI
-    // Don't need to check return from getRequestContextPath because there must
-    // always be a vlaue even if an empty string
-    String ctxPath = getRequestContextPath();
-    if (ctxPath.length() > 0 && !s.startsWith(ctxPath))
-    {
-      s = ctxPath + s;
+      // prepend the context path since portletResponse.encodeURL() requires a full path URI
+      // Don't need to check return from getRequestContextPath because there must
+      // always be a vlaue even if an empty string
+      String ctxPath = getRequestContextPath();
+      if (ctxPath.length() > 0 && !s.startsWith(ctxPath))
+      {
+        s = ctxPath + s;
+      }
     }
 
     String resourceURLStr = mPortletResponse.encodeURL(s);

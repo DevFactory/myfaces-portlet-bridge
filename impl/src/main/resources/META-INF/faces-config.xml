@@ -23,5 +23,10 @@
         <view-handler>org.apache.myfaces.portlet.faces.application.PortletViewHandlerImpl</view-handler>
         <state-manager>org.apache.myfaces.portlet.faces.application.PortletStateManagerImpl</state-manager>
         <el-resolver>org.apache.myfaces.portlet.faces.el.PortletELResolver</el-resolver>
+        <application-extension>
+          <bridge:excluded-attributes>
+            <bridge:excluded-attribute>com.sun.faces.*</bridge:excluded-attribute>
+          </bridge:excluded-attributes>       
+        </application-extension>
     </application>
 </faces-config>
