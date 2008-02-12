@@ -19,7 +19,7 @@
     <!-- TODO: Is this the correct group id? -->
     <groupId>org.apache.myfaces.portlet-bridge</groupId>
     <artifactId>portlet-bridge</artifactId>
-    <version>1.0.0-alpha</version>
+    <version>1.0.0-SNAPSHOT</version>
   </parent>
   
   <modelVersion>4.0.0</modelVersion>
