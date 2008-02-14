@@ -17,16 +17,8 @@
     specific language governing permissions and limitations
     under the License.	   
 -->
-
-
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <artifactId>myfaces</artifactId>
-    <groupId>org.apache.myfaces</groupId>
-    <version>3</version>
-  </parent>
-
   <groupId>org.apache.myfaces.portlet-bridge</groupId>
   <artifactId>portlet-bridge</artifactId>
   <packaging>pom</packaging>
@@ -41,6 +33,12 @@
   </description>
   <url>http://myfaces.apache.org/portlet-bridge</url>
 
+  <parent>
+    <artifactId>myfaces</artifactId>
+    <groupId>org.apache.myfaces</groupId>
+    <version>3</version>
+  </parent>
+  
   <issueManagement>
     <system>jira</system>
     <url>http://issues.apache.org/jira/browse/PORTLETBRIDGE</url>
@@ -57,10 +55,21 @@
       <organizationUrl>http://www.oracle.com/</organizationUrl>
       <email>sobryan@apache.org</email>
       <roles>
-        <role>Expert Group Member</role>
         <role>Project Lead</role>
+        <role>JSR-301 EG Member</role>
       </roles>
       <timezone>-7</timezone>
+    </developer>
+    <developer>
+      <id>mfreedman</id>
+      <name>Michael Freedman</name>
+      <organization>Oracle Corporation, U.S.A.</organization>
+      <organizationUrl>http://www.oracle.com/</organizationUrl>
+      <email>michael.freedman@oracle.com</email>
+      <roles>
+        <role>JSR-301 Spec Lead</role>
+      </roles>
+      <timezone>-8</timezone>
     </developer>
     <developer>
       <id>mmarinschek</id>
@@ -68,7 +77,7 @@
       <organization>Irian, Austria</organization>
       <email>martin.marinschek@gmail.com</email>
       <roles>
-        <role>Expert Group Member</role>
+        <role>JSR-301 EG Member</role>
       </roles>
       <timezone>+1</timezone>
     </developer>
@@ -79,7 +88,7 @@
       <organization>JBoss/Blog/organization</organization>
       <organizationUrl>http://jboss.org/jbossBlog/blog/Stan%20Silvert/</organizationUrl>
       <roles>
-        <role>Expert Group Member</role>
+        <role>JSR-301 EG Member</role>
       </roles>
       <timezone />
     </developer>
@@ -94,16 +103,6 @@
   </developers>
 
   <contributors>
-    <contributor>
-      <name>Michael Freedman</name>
-      <organization>Oracle Corporation, U.S.A.</organization>
-      <organizationUrl>http://www.oracle.com/</organizationUrl>
-      <email>michael.freedman@oracle.com</email>
-      <roles>
-        <role>JSR-301 Spec Lead</role>
-      </roles>
-      <timezone>-8</timezone>
-    </contributor>
   </contributors>
 
   <scm>
@@ -203,7 +202,8 @@
           <groupId>javax.faces</groupId>
           <artifactId>jsf-api</artifactId>
           <!-- As per spec, 1.2_03 is the minimum R.I. for version 1.0 bridge -->
-          <version>1.2_03</version> 
+          <version>1.2_03</version>
+          <scope>provided</scope>
         </dependency>
 
         <!-- JSF Portlet Bridge API -->
@@ -216,7 +216,7 @@
         <!-- JSF Portlet Bridge Impl -->
         <dependency>
           <groupId>org.apache.myfaces.portlet-bridge</groupId>
-          <artifactId>portlet-bridge-api</artifactId>
+          <artifactId>portlet-bridge-impl</artifactId>
           <version>${pom.version}</version>
         </dependency>
       </dependencies>
@@ -259,6 +259,66 @@
         <!-- TODO Add impl when we have a reason to (for tests and demo apps) -->
       </dependencies>
     </profile>
+    
+    <!-- mvn clean source:jar install deploy -DaltDeploymentRepository=sobryan::default::file://FOLDER -Prelease -->
+    <profile>
+      <id>release</id>
+      <modules>
+        <module>assembly</module>
+      </modules>
+      <build>
+        <plugins>
+          <!-- GPG Signing of Release (http://maven.apache.org/plugins/maven-gpg-plugin) -->
+          <!-- This provides an ASC file for each artifact.  This is used to ensure that a jar
+               was indeed created by the person you suspect it's been created by. -->
+        	 <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+        	 </plugin>
+        	 
+        	 <!-- Javadoc Plugin (http://maven.apache.org/plugins/maven-javadoc-plugin/)-->
+        	 <!-- This generates javadoc jars for each module -->
+        	 <plugin>
+        	   <groupId>org.apache.maven.plugins</groupId>
+        	   <artifactId>maven-javadoc-plugin</artifactId>
+        	   <version>2.2</version>
+        	   <executions>
+        	   	<execution>
+        	   	  <id>attach-javadocs</id>
+        	   	  <goals>
+        	   	    <goal>jar</goal>
+        	   	  </goals>
+        	   	</execution>
+        	   </executions>
+        	 </plugin>
+        	 
+        	 <!-- Source Control Management (http://maven.apache.org/scm/) -->
+        	 <!-- This will update source before tree is built -->
+        	 <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-scm-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>validate</phase>
+                <id>getting-scm.revision</id>
+                <goals>
+                  <goal>update</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin> 
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
   <!-- Global dependencies needed for all modules -->
@@ -272,13 +332,13 @@
       <groupId>portlet-api</groupId>
       <artifactId>portlet-api</artifactId>
     </dependency>
-
+    
     <dependency>
       <groupId>javax.servlet.jsp</groupId>
       <artifactId>jsp-api</artifactId>
     </dependency>
   </dependencies>
-
+  
   <reporting>
     <excludeDefaults>true</excludeDefaults>
     <plugins>
