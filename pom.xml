@@ -23,7 +23,7 @@
   <artifactId>portlet-bridge</artifactId>
   <packaging>pom</packaging>
   <name>Portlet Bridge for JavaServer Faces</name>
-  <version>1.0.0-SNAPSHOT</version>	 
+  <version>1.0.0-alpha</version>	 
   <inceptionYear>2007</inceptionYear>  
   <description>
   Portlet Bridge for JavaServer Faces is a subproject of Apache MyFaces which provides an
@@ -106,9 +106,9 @@
   </contributors>
 
   <scm>
-    <connection>scm:svn:http://svn.apache.org/repos/asf/myfaces/portlet-bridge/trunk</connection>
-    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/myfaces/portlet-bridge/trunk</developerConnection>
-    <url>http://svn.apache.org/viewcvs.cgi/myfaces/portlet-bridge/trunk</url>
+    <connection>scm:svn:http://svn.apache.org/repos/asf/myfaces/portlet-bridge/tags/portlet-bridge-1.0.0-alpha</connection>
+    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/myfaces/portlet-bridge/tags/portlet-bridge-1.0.0-alpha</developerConnection>
+    <url>http://svn.apache.org/viewcvs.cgi/myfaces/portlet-bridge/tags/portlet-bridge-1.0.0-alpha</url>
   </scm>
 
   <distributionManagement>
